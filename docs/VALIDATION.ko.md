@@ -43,9 +43,20 @@ AddressSanitizer와 UndefinedBehaviorSanitizer를 함께 사용하는 실행도 
 
 **실제 Windows에서 프로그램을 실행하거나 마이크/프로세스 오디오를 캡처하는 통합 테스트는 수행하지 못했습니다.** 교차 빌드 성공을 Windows 실기 검증 성공으로 표시하지 않습니다.
 
+## 공개 저장소의 Windows 네이티브 CI 검증
+
+[GitHub Actions 실행 기록](https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858)의 커밋 `7bcf3ea8088d9786afa9daf94ee1c3630922897f`를 검증했습니다.
+
+- runner: `windows-2022` (Windows Server 2022; Windows 11 데스크톱 실기 장비가 아님).
+- compiler: MSVC `19.44.35229.0` / Visual Studio 2022.
+- Windows SDK: `10.0.26100.0`.
+- CMake Configure, Release Build, core CTest, EXE artifact 업로드 모두 성공.
+- CTest: `1/1 mixer_core_tests` 통과, `100% tests passed, 0 tests failed`.
+- 이 CI는 Windows 전용 GUI·오디오 코드를 실제 MSVC로 컴파일·링크하고 코어 테스트 EXE를 Windows에서 실행한 검증입니다. GUI 실행이나 실제 오디오 캡처 검증은 수행하지 않았습니다.
+- 저장소 `downloads/PortableMixer.exe`는 앞에서 기록한 SHA256의 LLVM-MinGW 배포 바이너리입니다. CI가 별도로 빌드한 MSVC 아티팩트와 같은 바이너리라고 표시하지 않습니다.
+
 ## 수행하지 못한 항목
 
-- Windows 전용 `main.cpp` / `audio_engine.cpp`의 MSVC 컴파일 및 링크.
 - Windows에서 EXE 실행·서명·실기 오디오 캡처. EXE 생성 자체는 위 교차 빌드로 완료했습니다.
 - 실제 마이크 형식 자동 변환, 프로세스 캡처 격리, 자식 프로세스 처리, QPC 기반 실기 동기화.
 - 장치 교체/제거, 개인정보 보호 권한, Bluetooth 프로필, 절전/복귀, 장시간 녹음, 디스크 오류의 Windows 통합 시험.

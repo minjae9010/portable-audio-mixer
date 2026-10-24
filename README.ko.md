@@ -27,7 +27,7 @@ Developer PowerShell에서 프로젝트 루트 기준:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1
 ```
 
-스크립트는 프로젝트를 빌드하고 플랫폼 공통 핵심 테스트를 실행합니다. 성공 시 EXE 경로는 `build\Release\PortableMixer.exe`입니다. 실행에 관리자 권한, 설치 프로그램, 외부 가상 케이블은 요구하지 않도록 작성했습니다. `/MT`로 VC 런타임 설치 의존성을 줄였으며 Windows 시스템 DLL은 사용합니다. MSVC를 사용한 Windows 네이티브 빌드는 이 환경에서 확인하지 못했습니다. 제공 EXE는 아래 LLVM-MinGW 교차 빌드 결과입니다.
+스크립트는 프로젝트를 빌드하고 플랫폼 공통 핵심 테스트를 실행합니다. 성공 시 EXE 경로는 `build\Release\PortableMixer.exe`입니다. 실행에 관리자 권한, 설치 프로그램, 외부 가상 케이블은 요구하지 않도록 작성했습니다. `/MT`로 VC 런타임 설치 의존성을 줄였으며 Windows 시스템 DLL은 사용합니다. MSVC 네이티브 빌드와 코어 테스트는 [GitHub Windows CI](https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858)에서 통과했습니다. CI 운영체제는 Windows Server 2022이며 Windows 11 오디오 실기 테스트를 대신하지 않습니다. 제공 EXE는 아래 LLVM-MinGW 교차 빌드 결과입니다.
 
 동등한 명령:
 
@@ -37,7 +37,7 @@ cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-`.github/workflows/windows-build.yml`도 포함했습니다. 사용자가 이 소스를 저장소 루트에 올려 실행할 때 Windows 빌드와 코어 테스트 및 EXE 아티팩트 생성을 수행합니다. 이 워크플로는 여기서 업로드·실행하지 않았으며 CI 성공도 오디오 실기 검증을 뜻하지 않습니다.
+`.github/workflows/windows-build.yml`도 포함했습니다. 사용자가 이 소스를 저장소 루트에 올려 실행할 때 Windows 빌드와 코어 테스트 및 EXE 아티팩트 생성을 수행합니다. 이 워크플로는 공개 저장소에서 [실행·통과](https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858)했습니다. CI 성공은 오디오 실기 검증을 뜻하지 않습니다.
 
 ## 제공 EXE 및 Linux 교차 빌드
 

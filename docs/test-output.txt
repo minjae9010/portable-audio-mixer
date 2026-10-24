@@ -7,7 +7,8 @@ Windows GUI and audio code cross compilation/link: PASS, LLVM-MinGW 20261020 / C
 Windows core test EXE cross compilation/link: PASS; execution NOT RUN
 Windows binary static checks: PASS (PE32+ AMD64 GUI, manifest, imports, ASLR/NX)
 Windows application runtime/audio tests: NOT RUN
-MSVC native build: NOT RUN
+MSVC native Release build + Windows core CTest: PASS (Windows Server 2022 GitHub Actions; MSVC 19.44.35229.0; SDK 10.0.26100.0)
 Discord general microphone output: NOT IMPLEMENTED
 EXE bytes: 573440
 EXE SHA256: 3e0cd895bfd9a0071ade3dfdfb9d4871267d31616ac2c34742bba3a3f5670732
+Windows CI evidence: https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858

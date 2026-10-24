@@ -31,7 +31,7 @@ SHA256: `3e0cd895bfd9a0071ade3dfdfb9d4871267d31616ac2c34742bba3a3f5670732`
 | Linux 핵심 믹서 테스트 | 510 assertions 통과 |
 | Linux UBSan / 독립 WAV 파서 | 통과 |
 | 실제 Windows 실행·WASAPI 오디오 테스트 | **미수행** |
-| MSVC 네이티브 빌드 | 미수행; 빌드 스크립트와 CI 포함 |
+| MSVC 네이티브 빌드·코어 CTest | [Windows CI 통과](https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858) — Windows Server 2022, MSVC 19.44, SDK 26100 |
 | Discord 일반 마이크 송출 | **미지원** |
 | EXE 디지털 서명 | 없음 |
 
