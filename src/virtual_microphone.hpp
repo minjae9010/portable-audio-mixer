@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <cfgmgr32.h>
 #include <mmdeviceapi.h>
+#include <audioclient.h>
 #include <devicetopology.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <wrl/client.h>
@@ -77,23 +78,56 @@ inline bool endpointBelongsTo(IMMDevice* endpoint, IMMDeviceEnumerator* enumerat
     CoTaskMemFree(connected);
     return SUCCEEDED(hr) && belongsTo(device.Get(), adapter);
 }
+struct EndpointCandidate { std::wstring id; WORD channels; DWORD connector=0xffffffff; };
+inline std::wstring selectEndpoint(const std::vector<EndpointCandidate>& candidates) {
+    std::wstring result; uint64_t best=UINT64_MAX; bool tied=false;
+    for(const auto& candidate:candidates) {
+        if(!candidate.channels) continue;
+        const uint64_t channelRank=candidate.channels==2 ? 0 : candidate.channels;
+        const uint64_t rank=(static_cast<uint64_t>(candidate.connector)<<16)|channelRank;
+        if(rank<best) { best=rank; result=candidate.id; tied=false; }
+        else if(rank==best && candidate.id!=result) tied=true;
+    }
+    return tied ? std::wstring{} : result;
+}
 inline std::wstring findEndpoint(const std::wstring& adapter, EDataFlow flow) {
     ComPtr<IMMDeviceEnumerator> enumerator; ComPtr<IMMDeviceCollection> collection;
     if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator))) ||
         FAILED(enumerator->EnumAudioEndpoints(flow, DEVICE_STATE_ACTIVE, &collection))) return {};
     UINT count = 0; collection->GetCount(&count);
-    std::wstring result;
+    std::vector<EndpointCandidate> candidates;
     for (UINT i = 0; i < count; ++i) {
         ComPtr<IMMDevice> endpoint;
         if (FAILED(collection->Item(i, &endpoint)) || !endpointBelongsTo(endpoint.Get(), enumerator.Get(), adapter)) continue;
+        // Pack45 exposes standard and 16-channel render endpoints on the same
+        // adapter. Both can have a stereo shared format. Use the native topology
+        // connector order (standard pin before the multichannel pin), not names.
+        DWORD connectorId=0xffffffff;
+        ComPtr<IDeviceTopology> topology; ComPtr<IConnector> connector;
+        if(SUCCEEDED(endpoint->Activate(__uuidof(IDeviceTopology),CLSCTX_ALL,nullptr,
+            reinterpret_cast<void**>(topology.GetAddressOf()))) && SUCCEEDED(topology->GetConnector(0,&connector))) {
+            LPWSTR connected=nullptr;
+            if(SUCCEEDED(connector->GetConnectorIdConnectedTo(&connected))) {
+                const wchar_t* slash=wcsrchr(connected,L'/');
+                if(slash && slash[1]) {
+                    wchar_t* end=nullptr; const auto value=wcstoul(slash+1,&end,16);
+                    if(end && !*end) connectorId=value;
+                }
+                CoTaskMemFree(connected);
+            }
+        }
+        ComPtr<IAudioClient> client;
+        if(FAILED(endpoint->Activate(__uuidof(IAudioClient),CLSCTX_ALL,nullptr,
+            reinterpret_cast<void**>(client.GetAddressOf())))) continue;
+        WAVEFORMATEX* format=nullptr;
+        if(FAILED(client->GetMixFormat(&format))) continue;
+        const WORD channels=format->nChannels; CoTaskMemFree(format);
         LPWSTR id = nullptr;
         if (SUCCEEDED(endpoint->GetId(&id))) {
-            if (!result.empty()) { CoTaskMemFree(id); return {}; }
-            result = id; CoTaskMemFree(id);
-            if (flow == eCapture) break; // Pack45 also exposes a multichannel capture endpoint.
+            candidates.push_back({id,channels,connectorId}); CoTaskMemFree(id);
         }
     }
-    return result;
+    return selectEndpoint(candidates);
 }
 struct GuardState { DWORD result; wchar_t instance[MAX_DEVICE_ID_LEN]; };
 constexpr DWORD Pending = 0xffffffff, Missing = 0xfffffffe, Busy = 0xfffffffd, Ambiguous = 0xfffffffc;

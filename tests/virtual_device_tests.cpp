@@ -45,6 +45,12 @@ struct Fixture {
 };
 int main() {
     try {
+        using virtual_mic::selectEndpoint;
+        require(selectEndpoint({{L"16ch",2,0x10002},{L"standard",2,0x10001}})==L"standard","Pack45 standard connector must win even when both endpoints use stereo format");
+        require(selectEndpoint({{L"standard",2,0x10001},{L"16ch",2,0x10002}})==L"standard","Native endpoint choice must not depend on enumeration order");
+        require(selectEndpoint({{L"a",2,0x10001},{L"b",2,0x10001}}).empty(),"Unresolved same-connector ambiguity must remain blocked");
+        require(selectEndpoint({{L"only",2}})==L"only","A single endpoint without topology metadata must remain usable");
+        require(selectEndpoint({}).empty(),"Missing endpoints must not appear ready");
         const std::wstring name=L"Local\\PortableMixer.Test.Lease."+std::to_wstring(GetCurrentProcessId());
         { Fixture f; f.start(name); require(f.state->result==CR_SUCCESS,"startup success");
           require(f.enables==1 && f.disables==0,"enabled only while parent lives");
