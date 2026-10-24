@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{4AAFE132-9C45-48E4-8595-91EFAB3C4990}</ProjectGuid>
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <Platform Condition="'$(Platform)'==''">x64</Platform>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion><DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <DriverType>KMDF</DriverType><PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries>
+    <SpectreMitigation>false</SpectreMitigation><SignMode>Off</SignMode>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <TargetName>PortableMixerVirtualMic</TargetName>
+    <OutDir>$(MSBuildThisFileDirectory)..\build\driver\</OutDir>
+    <IntDir>$(MSBuildThisFileDirectory)..\build\driver-obj\</IntDir>
+    <EnableInf2cat>true</EnableInf2cat><Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard><WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError><DisableSpecificWarnings>4595;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(MSBuildThisFileDirectory)vendor\sysvad;$(MSBuildThisFileDirectory)vendor\sysvad\EndpointsCommon;$(MSBuildThisFileDirectory)vendor\sysvad\TabletAudioSample;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WIN32;UNICODE;_UNICODE;PC_IMPLEMENTATION;_USE_WAVERT_;_USE_IPortClsRuntimePower;_NEW_DELETE_OPERATORS_;DEBUG_LEVEL=DEBUGLVL_TERSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ExceptionHandling>false</ExceptionHandling>
+    </ClCompile>
+    <Link><AdditionalDependencies>portcls.lib;stdunk.lib;libcntpr.lib;wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="portable_mic.cpp" />
+    <ClCompile Include="vendor/sysvad/adapter.cpp" />
+    <ClCompile Include="vendor/sysvad/basetopo.cpp" />
+    <ClCompile Include="vendor/sysvad/common.cpp" />
+    <ClCompile Include="vendor/sysvad/hw.cpp" />
+    <ClCompile Include="vendor/sysvad/kshelper.cpp" />
+    <ClCompile Include="vendor/sysvad/savedata.cpp" />
+    <ClCompile Include="vendor/sysvad/tonegenerator.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/AudioModuleHelper.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/MiniportAudioEngineNode.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/MiniportStreamAudioEngineNode.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/mintopo.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/minwavert.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/minwavertstream.cpp" />
+    <ClCompile Include="vendor/sysvad/EndpointsCommon/NewDelete.cpp" />
+    <ClCompile Include="vendor/sysvad/TabletAudioSample/micintopo.cpp" />
+    <Inf Include="PortableMixerVirtualMic.inx" />
+    <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

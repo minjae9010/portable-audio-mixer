@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <WindowsSdkDir Condition="'$(WindowsSdkDir)'==''">C:\Program Files (x86)\Windows Kits\10\</WindowsSdkDir>
+    <PortableWdk>$(MSBuildThisFileDirectory)..\build\driver-packages\Microsoft.Windows.WDK.x64.10.0.26100.6584</PortableWdk>
+  </PropertyGroup>
+  <Import Project="$(PortableWdk)\build\native\Microsoft.Windows.WDK.x64.props" Condition="Exists('$(PortableWdk)\build\native\Microsoft.Windows.WDK.x64.props')" />
+</Project>

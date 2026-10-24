@@ -1,5 +1,7 @@
 #include "mixer_core.hpp"
 #include "wav_writer.hpp"
+#include "mix_output.hpp"
+#include "../shared/pcm_ring.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -89,10 +91,59 @@ void wavTests(const std::filesystem::path& path) {
     try { mix::WavWriter invalid(path / "absent" / "bad.wav"); } catch (const std::runtime_error&) { rejected = true; }
     require(rejected, "invalid output path is reported");
 }
+void outputFaderTests() {
+    mix::OutputControl output;
+    output.gain=.5f;
+    mix::OutputFader fader(output.target());
+    mix::Block block; block.fill({.8f,-.4f});
+    float peak=fader.apply(block,output);
+    require(near(peak,.4f) && near(block.back().l,.4f) && near(block.back().r,-.2f),"Master gain must scale the mixed stereo signal and its meter");
+    output.muted=true; block.fill({.8f,-.4f}); fader.apply(block,output);
+    require(block.front().l>0 && near(block.back().l,0),"Mute must ramp over one block without a discontinuous gain step");
+    block.fill({.8f,-.4f}); peak=fader.apply(block,output);
+    require(near(peak,0),"Muted outgoing audio must be silent");
+    for(const auto& frame:block) require(near(frame.l,0) && near(frame.r,0),"Mute must silence both output channels");
+    output.gain=.25f; block.fill({.8f,-.4f});
+    require(near(fader.apply(block,output),0),"Changing the fader while muted must not leak audio");
+    output.muted=false; block.fill({.8f,-.4f}); fader.apply(block,output);
+    require(block.front().l<block.back().l && near(block.back().l,.2f),"Unmute must restore the selected gain with a ramp");
+    output.muted=true; mix::OutputFader restarted(output.target()); block.fill({1,1});
+    require(near(restarted.apply(block,output),0),"Starting a mix while muted must not leak an initial audio block");
+}
+void virtualMicRingTests() {
+    pm::PcmRing ring;
+    pm::Cursor a, b;
+    int16_t input[480], output[480];
+    for (int i = 0; i < 480; ++i) input[i] = static_cast<int16_t>(i - 240);
+    ring.read(a, output, 480);
+    for (auto value : output) require(value == 0, "empty virtual mic is silent");
+    ring.write(input, 480);
+    ring.read(a, output, 480);
+    for (int i = 0; i < 480; ++i) require(output[i] == input[i], "virtual mic preserves PCM samples");
+    ring.read(b, output, 480);
+    for (int i = 0; i < 480; ++i) require(output[i] == input[i], "independent capture clients receive same audio");
+    ring.read(a, output, 480);
+    for (auto value : output) require(value == 0, "underrun does not replay old audio");
+    ring.reset();
+    ring.read(b, output, 480);
+    for (auto value : output) require(value == 0, "writer close clears previous conversation");
+    for (int block = 0; block < 20; ++block) {
+        for (auto& value : input) value = static_cast<int16_t>(block);
+        ring.write(input, 480);
+    }
+    ring.read(a, output, 480);
+    for (auto value : output) require(value == 18, "late capture skips to bounded live window");
+    ring.read(a, output, 480);
+    for (auto value : output) require(value == 19, "ring wrap retains latest audio in order");
+    ring.reset();
+    for (auto& value : input) value = 123;
+    ring.write(input, 480); ring.read(a, output, 480);
+    for (auto value : output) require(value == 123, "writer restart reinitializes existing capture cursor");
+}
 }
 int main(int argc, char** argv) {
     try {
-        timelineTests(); mixingTests();
+        timelineTests(); mixingTests(); outputFaderTests(); virtualMicRingTests();
         const auto path = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::path("core-test.wav");
         wavTests(path);
         std::cout << "PASS: " << assertions << " assertions; WAV artifact: " << path.string() << '\n';

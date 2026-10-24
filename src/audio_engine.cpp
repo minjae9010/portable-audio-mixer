@@ -1,4 +1,5 @@
 #include "audio_engine.hpp"
+#include "virtual_microphone.hpp"
 #include "wav_writer.hpp"
 #include <audioclient.h>
 #include "process_loopback_compat.hpp"
@@ -33,6 +34,53 @@ struct AudioScheduling {
     HANDLE task = nullptr;
     AudioScheduling() { DWORD index = 0; task = AvSetMmThreadCharacteristicsW(L"Audio", &index); }
     ~AudioScheduling() { if (task) AvRevertMmThreadCharacteristics(task); }
+};
+class VirtualMicSink {
+    ComPtr<IAudioClient> client_;
+    ComPtr<IAudioRenderClient> render_;
+    UINT32 capacity_ = 0;
+public:
+    explicit VirtualMicSink(const std::wstring& endpointId) {
+        ComPtr<IMMDeviceEnumerator> enumerator; ComPtr<IMMDevice> device;
+        check(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator)), L"Create render enumerator");
+        check(enumerator->GetDevice(endpointId.c_str(), &device), L"Open VB-CABLE render endpoint");
+        const auto adapters = virtual_mic::cables();
+        if (adapters.size() != 1 || !virtual_mic::endpointBelongsTo(device.Get(), enumerator.Get(), adapters.front()))
+            throw std::runtime_error("Output is not the managed VB-CABLE; refusing to send audio");
+        check(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
+            reinterpret_cast<void**>(client_.GetAddressOf())), L"Activate VB-CABLE output");
+        WAVEFORMATEX format{};
+        format.wFormatTag = WAVE_FORMAT_PCM; format.nChannels = 2;
+        format.nSamplesPerSec = mix::Rate; format.wBitsPerSample = 16;
+        format.nBlockAlign = 4; format.nAvgBytesPerSec = mix::Rate * 4;
+        check(client_->Initialize(AUDCLNT_SHAREMODE_SHARED,
+            AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+            1000000, 0, &format, nullptr), L"Initialize VB-CABLE 48 kHz stereo");
+        check(client_->GetBufferSize(&capacity_), L"Get VB-CABLE buffer size");
+        check(client_->GetService(IID_PPV_ARGS(&render_)), L"Get VB-CABLE render service");
+        BYTE* data = nullptr;
+        const UINT32 prefill = (std::min)(capacity_, UINT32(mix::BlockFrames * 2));
+        check(render_->GetBuffer(prefill, &data), L"Prime VB-CABLE buffer");
+        check(render_->ReleaseBuffer(prefill, AUDCLNT_BUFFERFLAGS_SILENT), L"Prime VB-CABLE silence");
+        check(client_->Start(), L"Start VB-CABLE output");
+    }
+    ~VirtualMicSink() { if (client_) { client_->Stop(); client_->Reset(); } }
+    VirtualMicSink(const VirtualMicSink&) = delete;
+    bool push(const mix::Block& block) {
+        UINT32 padding = 0;
+        check(client_->GetCurrentPadding(&padding), L"Read VB-CABLE buffer (device disconnected?)");
+        // Keep realtime bounded if render/capture clocks drift. No worker sleeps
+        // or blocking writes that could prevent stop or capture packet draining.
+        if (padding > capacity_ || capacity_ - padding < mix::BlockFrames) return false;
+        BYTE* data = nullptr;
+        check(render_->GetBuffer(mix::BlockFrames, &data), L"Get VB-CABLE output buffer");
+        auto* pcm = reinterpret_cast<int16_t*>(data);
+        for (size_t i = 0; i < block.size(); ++i) {
+            pcm[2*i] = mix::toPcm(block[i].l); pcm[2*i+1] = mix::toPcm(block[i].r);
+        }
+        check(render_->ReleaseBuffer(mix::BlockFrames, 0), L"Send mix to VB-CABLE");
+        return true;
+    }
 };
 uint64_t qpc100ns() {
     LARGE_INTEGER t{}, f{};
@@ -205,19 +253,20 @@ AudioEngine::AudioEngine() {
 AudioEngine::~AudioEngine() { stop(); CloseHandle(stop_); }
 void AudioEngine::status(std::wstring text) { std::lock_guard<std::mutex> lock(textMutex_); text_ = std::move(text); }
 std::wstring AudioEngine::statusText() const { std::lock_guard<std::mutex> lock(textMutex_); return text_; }
-void AudioEngine::start(DWORD pid, std::wstring micId, std::wstring path) {
+void AudioEngine::start(DWORD pid, std::wstring micId, std::wstring path, std::wstring outputId) {
     stop(); ResetEvent(stop_);
     clips = 0; late = 0; missing = 0; overflows = 0; discontinuities = 0; timestampErrors = 0;
     processPeak = 0; micPeak = 0; outputPeak = 0;
+    output.peak=0; output.active=false;
     active = true; status(L"Starting capture...");
-    try { thread_ = std::thread(&AudioEngine::run, this, pid, std::move(micId), std::move(path)); }
+    try { thread_ = std::thread(&AudioEngine::run, this, pid, std::move(micId), std::move(path), std::move(outputId)); }
     catch (...) { active = false; throw; }
 }
 void AudioEngine::stop() {
     SetEvent(stop_);
     if (thread_.joinable()) thread_.join();
 }
-void AudioEngine::run(DWORD pid, std::wstring micId, std::wstring path) noexcept {
+void AudioEngine::run(DWORD pid, std::wstring micId, std::wstring path, std::wstring outputId) noexcept {
     try {
         ComApartment apartment;
         // Retain a process handle to detect exit and avoid silently tracking a reused PID.
@@ -235,16 +284,21 @@ void AudioEngine::run(DWORD pid, std::wstring micId, std::wstring path) noexcept
         AudioScheduling scheduling;
         if (WaitForSingleObject(stop_, 0) == WAIT_OBJECT_0)
             throw Failure{HRESULT_FROM_WIN32(ERROR_CANCELLED), L"Stopped"};
-        auto disk = std::make_unique<DiskSink>(path);
+        VirtualMicSink output(outputId);
+        uint64_t outputDrops = 0;
+        std::unique_ptr<DiskSink> disk;
+        if (!path.empty()) disk = std::make_unique<DiskSink>(path);
         mix::Timeline processTimeline, micTimeline; mix::Mixer mixer; mix::Block block;
+        mix::OutputFader outputFader(this->output.target());
         const uint64_t epoch = qpc100ns(); int64_t cursor = 0;
         app.start(); mic.start();
-        status(L"Recording mix to WAV. Discord microphone output: unavailable.");
+        this->output.active=true;
+        status(disk ? L"Mixing to virtual microphone and WAV." : L"Mixing to virtual microphone.");
         HANDLE waits[]{stop_, process, app.event, mic.event};
         for (;;) {
             const DWORD w = WaitForMultipleObjects(4, waits, FALSE, 10);
             if (w == WAIT_OBJECT_0) break;
-            if (w == WAIT_OBJECT_0+1) { status(L"Target process exited. Recording finalized."); break; }
+            if (w == WAIT_OBJECT_0+1) { status(L"Target process exited. Mix stopped."); break; }
             if (w == WAIT_FAILED) throw Failure{HRESULT_FROM_WIN32(GetLastError()), L"Capture wait"};
             app.drain(processTimeline, epoch, *this); mic.drain(micTimeline, epoch, *this);
             // Packet QPC timestamps share a clock. Keep 80 ms for packet delivery
@@ -255,27 +309,31 @@ void AudioEngine::run(DWORD pid, std::wstring micId, std::wstring path) noexcept
             while (cursor + mix::BlockFrames <= ready) {
                 const auto meter = mixer.render(processTimeline, micTimeline, cursor,
                     processGain.load(), micGain.load(), block);
-                processPeak = meter.process; micPeak = meter.mic; outputPeak = meter.output;
+                processPeak = meter.process; micPeak = meter.mic;
+                outputPeak=outputFader.apply(block,this->output); this->output.peak=outputPeak.load();
                 clips += meter.clipped;
-                disk->push(block); cursor += mix::BlockFrames;
+                if (!output.push(block)) outputDrops += mix::BlockFrames;
+                if (disk) disk->push(block);
+                cursor += mix::BlockFrames;
             }
             late = processTimeline.late + micTimeline.late;
             missing = processTimeline.missing + micTimeline.missing;
-            overflows = processTimeline.overflow + micTimeline.overflow;
+            overflows = processTimeline.overflow + micTimeline.overflow + outputDrops;
         }
         app.stop(); mic.stop();
         // Drain final packets and flush through the stop time, including the
         // normal 80 ms lookahead, so short recordings keep their final audio.
         app.drain(processTimeline, epoch, *this); mic.drain(micTimeline, epoch, *this);
         const int64_t end = mix::samplePosition(qpc100ns(), epoch);
-        if (end - cursor <= mix::Rate/2) {
+        if (disk && end - cursor <= mix::Rate/2) {
             while (cursor < end) {
                 mixer.render(processTimeline, micTimeline, cursor, processGain.load(), micGain.load(), block);
+                outputFader.apply(block,this->output);
                 disk->push(block); cursor += mix::BlockFrames;
             }
         }
-        disk->finish();
-        if (WaitForSingleObject(stop_, 0) == WAIT_OBJECT_0) status(L"Stopped. WAV finalized.");
+        if (disk) disk->finish();
+        if (WaitForSingleObject(stop_, 0) == WAIT_OBJECT_0) status(disk ? L"Stopped. WAV finalized." : L"Stopped.");
     } catch (const Failure& f) {
         if (f.hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) status(L"Stopped.");
         else {
@@ -285,5 +343,6 @@ void AudioEngine::run(DWORD pid, std::wstring micId, std::wstring path) noexcept
         }
     } catch (const std::exception& e) { status(L"Error: " + widen(e.what())); }
       catch (...) { status(L"Unexpected audio error. Recording stopped."); }
+    output.peak=0; output.active=false; outputPeak=0;
     active = false;
 }

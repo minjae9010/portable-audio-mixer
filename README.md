@@ -1,59 +1,42 @@
-# Portable Audio Mixer
+# Portable Audio Mixer 0.5.1
 
-Windows 11 x64용 C++17 네이티브 오디오 캡처·믹싱 프로토타입입니다.
+Windows 11 x64용 앱 오디오·마이크 믹서입니다. **기존 Microsoft 서명 VB-CABLE 드라이버**에 믹싱 결과를 보내 Discord 입력으로 사용합니다. 자체 드라이버 서명이나 Windows 테스트 모드는 필요하지 않습니다.
 
-**이 프로그램은 Discord의 일반 마이크 입력으로 오디오를 송출하지 않습니다.** 선택한 프로세스 트리와 마이크를 실시간으로 믹싱하여 WAV 파일로 기록합니다. 가상 오디오 장치나 서비스를 설치하지 않습니다.
+## 루프백 듣기
 
-## 기능
+메인 화면 아래 `현재 소리 확인`에서 캡처할 출력 장치와 별도의 듣기 장치를 선택한 뒤 `루프백 듣기`를 누릅니다. 송출 믹스는 `CABLE Input → 실제 헤드폰`으로 확인합니다. 같은 장치를 양쪽에 선택하면 시작하지 않으며, 듣기 중지는 녹음·송출을 중지하지 않습니다. 자세한 제한과 사용법은 [한국어 안내](README.ko.md)를 참고하세요.
 
-- WASAPI Process Loopback: 선택한 PID와 자식 프로세스 트리 캡처
-- 선택한 마이크의 shared-mode 동시 캡처
-- 각 입력 0–200% 볼륨과 10 ms 볼륨 전환
-- QPC 타임스탬프 정렬, 클리핑 제한, 입력·출력 피크 표시
-- Win32 시스템 트레이 UI
-- PCM16 / stereo / 48 kHz WAV 기록
-- 기존 출력 장치 설정 변경 및 외부 가상 케이블 설치 없음
+## 사용
 
-## 다운로드 및 실행
+1. **[PortableMixer.exe](downloads/PortableMixer.exe) 하나만 다운로드**해 실행하고 UAC를 승인합니다.
+2. VB-CABLE이 없다면 첫 실행에서 내장 설치 안내가 표시됩니다. `예`를 누르면 공식 설치 창이 열립니다. `Install Driver`로 설치하고 설치 창을 닫으면 장치를 바로 비활성화한 뒤 앱을 종료합니다. 제조사가 재부팅을 안내했다면 재부팅하세요. 다음 앱 실행 때 장치가 활성화됩니다.
+3. 이미 VB-CABLE이 있으면 설치 안내 없이 앱이 장치를 활성화합니다. `녹음 / 입력 설정`에서 프로그램과 실제 마이크를 선택하고 `믹스 시작`을 누릅니다. WAV 저장은 선택 사항입니다.
+4. Discord의 입력 장치를 **CABLE Output (VB-Audio Virtual Cable)**으로 선택합니다.
+5. 앱 창의 X 또는 종료 메뉴로 종료하면 VB-CABLE 장치 전체가 비활성화됩니다. 다음 실행에서 활성화됩니다.
 
-[**PortableMixer.exe 다운로드**](https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe) · [SHA256](downloads/SHA256SUMS.txt)
+별도 ZIP 다운로드나 실행 시 네트워크 연결은 필요하지 않습니다. 공식 Pack45의 모든 파일과 원본 readme를 EXE 리소스에 포함합니다. 설치는 사용자가 동의한 경우에만 진행하며, 취소하면 볼륨 믹서를 사용할 수 있습니다. `VB-CABLE 설치 / 안내` 버튼으로 다시 진행할 수 있습니다.
 
-배포 EXE는 Windows 11 **x64**용이며 크기는 560 KiB입니다. 다운로드 후 실행하여 대상 프로세스와 마이크를 선택하고 `Record WAV...`를 누릅니다. 창 닫기·최소화는 트레이로 숨기며, `Exit`로 완전히 종료합니다. Windows의 데스크톱 앱 마이크 접근 권한이 필요합니다.
+앱은 WASAPI shared-mode 48 kHz/stereo PCM16으로 보냅니다. Windows 기본 출력 장치를 CABLE로 바꿀 필요가 없습니다. 같은 CABLE에 다른 앱이 출력하면 그 소리도 전달될 수 있으므로 이 앱 전용으로 사용하세요. 첫 화면의 볼륨 슬라이더는 Windows 세션 볼륨을 제어합니다.
 
-SHA256: `3e0cd895bfd9a0071ade3dfdfb9d4871267d31616ac2c34742bba3a3f5670732`
+## 장치 연결과 해제
+
+- 정상 종료 및 부모 앱 비정상 종료를 감시하는 별도 프로세스가 장치를 비활성화합니다. 두 프로세스 모두 같은 EXE입니다.
+- 최소화/트레이 숨김은 실행 중이므로 연결을 유지합니다. 송출 중지는 오디오만 멈춥니다.
+- 비활성화는 Windows PnP 장치 단위로 수행합니다. 음소거만 하는 방식이 아닙니다. 캡처와 재생 장치가 함께 비활성화됩니다.
+- Discord 등 앱의 장치 목록 갱신에는 시간이 걸릴 수 있고, 비활성 장치 표시를 켠 Windows 설정/장치 관리자에는 항목이 남습니다. 드라이버 패키지를 매번 삭제하지 않습니다.
+- 앱과 감시 프로세스를 동시에 강제 종료하거나 전원이 끊기면 정리 코드를 실행할 수 없습니다. 이 경우 앱을 다시 실행한 뒤 종료하거나 장치 관리자에서 수동 비활성화하세요.
+- 표준 VB-CABLE 한 개만 지원합니다. A/B/C/D, Voicemeeter 및 다른 가상/실제 장치는 제어하지 않습니다. 식별자가 맞는 장치가 여러 개면 실행을 중단합니다.
 
 ## 검증 상태
 
-| 항목 | 결과 |
-|---|---|
-| Windows x64 EXE 교차 컴파일·링크 | 성공 — LLVM-MinGW 20261020 / Clang 23.1.4 |
-| PE 형식·매니페스트·DLL 의존성 정적 검사 | 통과 |
-| Linux 핵심 믹서 테스트 | 510 assertions 통과 |
-| Linux UBSan / 독립 WAV 파서 | 통과 |
-| 실제 Windows 실행·WASAPI 오디오 테스트 | **미수행** |
-| MSVC 네이티브 빌드·코어 CTest | [Windows CI 통과](https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858) — Windows Server 2022, MSVC 19.44, SDK 26100 |
-| Discord 일반 마이크 송출 | **미지원** |
-| EXE 디지털 서명 | 없음 |
+앱 빌드와 믹서/WAV/PCM 테스트, 장치 수명 모의 테스트 9개, 내장 파일 31개의 원본 SHA256 대조 테스트가 통과했습니다. 공식 Pack45의 Windows 10/11 x64 카탈로그에서 Microsoft 서명 유효성을 확인했습니다. **내장 설치 프로그램 실행 및 현재 PC의 VB-CABLE 설치는 하지 않았으므로 실제 장치 활성화·해제, WASAPI 송출과 Discord 수신은 미검증입니다.**
 
-프로세스 루프백은 PID 하나가 아닌 **자식 프로세스 트리까지 포함**합니다. 입력 패킷 여유는 80 ms이며, 장시간 클록 드리프트의 연속 보정은 구현하지 않았습니다. Bluetooth 마이크 사용에 따른 OS 오디오 프로필 변경까지 제어하지는 않습니다.
+[한국어 상세 안내](README.ko.md) · [검증 절차](docs/VIRTUAL_CABLE.ko.md) · [체크섬](downloads/SHA256SUMS.txt)
 
-## 소스 빌드
+## 빌드 및 라이선스
 
-Visual Studio 2022 C++ 도구, Windows SDK 22621 이상, CMake 3.24 이상을 설치한 Developer PowerShell:
+Visual Studio 2022 C++ Build Tools, Windows SDK, CMake로 `./scripts/build-windows.ps1`을 실행합니다. 현재 앱 빌드에는 WDK가 필요 없습니다. 저장소의 원본 `downloads/VBCABLE_Driver_Pack45.zip`을 SHA256으로 확인하고 빌드 시 리소스로 포함합니다. 배포 시에는 EXE만 전달하면 됩니다.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1
-```
+앱 소스는 [MIT](LICENSE)입니다. **VB-CABLE은 VB-Audio의 별도 Donationware 제품**이며 이 프로젝트의 MIT 라이선스에 포함되지 않습니다. 유용하게 사용한다면 [기부/라이선스 구매](https://shop.vb-audio.com/en/win-apps/11-vb-cable.html)를 해 주세요. [제조사 라이선스 및 배포 조건](https://vb-audio.com/Services/licensing.htm)을 따릅니다.
 
-Linux에서 공식 LLVM-MinGW UCRT 툴체인을 압축 해제한 경우:
-
-```bash
-LLVM_MINGW_ROOT=/absolute/path/to/llvm-mingw \
-  bash scripts/build-cross-linux.sh
-```
-
-자세한 사용법은 [한국어 설명](README.ko.md), 제약과 공식 문서 근거는 [기술 타당성 조사](docs/FEASIBILITY.ko.md), 실제 검증 기록은 [검증 결과](docs/VALIDATION.ko.md)를 참고하세요. Windows 실기 시험 절차는 [테스트 계획](docs/WINDOWS_TEST_PLAN.md)에 있습니다.
-
-## 라이선스
-
-프로젝트 소스는 [MIT License](LICENSE)입니다. 정적 링크된 런타임 관련 고지는 [third_party_licenses](third_party_licenses/)에 포함되어 있습니다.
+`driver/`와 `downloads/driver/`에는 이전 0.3 전용 드라이버 실험 소스 및 서명 전 패키지가 보존되어 있습니다. **현재 앱은 해당 드라이버를 사용하지 않으므로 설치하지 마세요.** 초기 WAV 프로토타입 문서와 이전 UI 검증 기록은 각 당시의 범위를 설명합니다.

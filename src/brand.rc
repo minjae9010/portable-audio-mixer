@@ -1,0 +1,2 @@
+#include "resource.h"
+IDI_PORTABLE_MIXER ICON "../assets/portable-mixer.ico"
