@@ -1,4 +1,34 @@
-# Portable Mixer 0.5.1 사용 안내
+<p align="center">
+  <img src="assets/portable-mixer.png" width="112" alt="Portable Audio Mixer icon">
+</p>
+<h1 align="center">Portable Audio Mixer</h1>
+<p align="center"><strong>앱 소리와 목소리를, 하나의 믹스로.</strong></p>
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.5.1-a78bfa?style=flat-square" alt="Version 0.5.1">
+  <img src="https://img.shields.io/badge/platform-Windows_11_x64-60a5fa?style=flat-square" alt="Windows 11 x64">
+  <img src="https://img.shields.io/badge/audio-48_kHz_%C2%B7_stereo-5eead4?style=flat-square" alt="48 kHz stereo">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/source-MIT-a78bfa?style=flat-square" alt="Source license: MIT"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe"><img src="https://img.shields.io/badge/Download-PortableMixer.exe-7c3aed?style=for-the-badge&logo=windows&logoColor=white" alt="Download PortableMixer.exe"></a>
+</p>
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.ko.md">한국어</a> · <a href="README.ja.md">日本語</a> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+---
+
+## 앱 소리와 마이크를 하나로
+
+믹서에 추가한 앱들과 마이크를 섞어 **VB-CABLE을 통해 Discord로 전달**합니다. 앱별 슬라이더와 음소거는 송출 믹스에만 적용하며 Windows 프로그램 볼륨은 변경하지 않습니다. 최종 믹스를 기본 스피커로 함께 듣거나 WAV로 저장할 수 있습니다.
+
+| 믹싱 | 볼륨 조절 | 소리 확인 |
+|:---|:---|:---|
+| 여러 앱 오디오 + 마이크 | 앱별 송출 볼륨·음소거 | 최종 믹스를 기본 스피커로 듣기 |
+| 선택적 WAV 녹음 | 입력별 게인 조절 | 녹음과 별도로 듣기 시작·중지 |
+
+> [!IMPORTANT]
+> VB-CABLE 설치에는 사용자 동의와 관리자 권한이 필요합니다. 실제 장치 활성화·해제, WASAPI 송출과 Discord 수신은 테스트 PC에서 **아직 검증하지 않았습니다**.
 
 ## 처음 설치
 
@@ -6,7 +36,7 @@
 
 첫 실행에서 VB-CABLE이 없으면 설치 여부를 묻습니다. `예`를 누르면 내장된 공식 `VBCABLE_Setup_x64.exe` 설치 창을 엽니다. `Install Driver`로 설치한 뒤 제조사 안내대로 재부팅하고 Portable Mixer를 다시 실행하세요. 외부 다운로드는 하지 않습니다. 기존 설치가 감지되면 설치 창을 띄우지 않습니다.
 
-`아니요`를 누르면 설치 없이 볼륨 믹서로 진행합니다. 이후 `녹음 / 입력 설정`의 `VB-CABLE 설치 / 안내` 버튼으로 다시 설치할 수 있습니다. 내장 설치 프로그램을 닫으면 장치를 즉시 비활성화하고 상태를 확인한 뒤 앱을 종료합니다. 다음 앱 실행 때 활성화합니다. 장치 인식이 늦으면 약 10초 이내에서 재시도하며, 미감지·여러 장치·비활성화 실패는 성공으로 안내하지 않습니다.
+`아니요`를 누르면 설치 없이 볼륨 믹서로 진행합니다. 이후 `송출 설정`의 `VB-CABLE 설치 / 안내` 버튼으로 다시 설치할 수 있습니다. 내장 설치 프로그램을 닫으면 장치를 즉시 비활성화하고 상태를 확인한 뒤 앱을 종료합니다. 다음 앱 실행 때 활성화합니다. 장치 인식이 늦으면 약 10초 이내에서 재시도하며, 미감지·여러 장치·비활성화 실패는 성공으로 안내하지 않습니다.
 
 VB-CABLE은 VB-Audio의 Donationware입니다. 유용하게 쓰면 [기부/라이선스 구매](https://shop.vb-audio.com/en/win-apps/11-vb-cable.html)를 해 주세요. 업무/기관 이용과 재배포에는 [제조사 조건](https://vb-audio.com/Services/licensing.htm)이 적용됩니다. 원본 패키지 및 장치 이름을 변경하지 않았습니다.
 
@@ -15,18 +45,18 @@ VB-CABLE은 VB-Audio의 Donationware입니다. 유용하게 쓰면 [기부/라�
 ## 송출
 
 1. PortableMixer.exe 실행 시 UAC를 승인합니다. 장치 활성화와 종료 시 비활성화에 관리자 권한이 필요합니다.
-2. `녹음 / 입력 설정`을 열고 프로그램과 실제 마이크를 선택합니다. 장치 준비 후 필요하면 `새로고침`을 누릅니다.
-3. VB-CABLE 연결 상태가 표시되면 `믹스 시작`을 누릅니다. WAV 저장은 선택 사항입니다.
+2. 메인 믹서에서 `앱 추가`로 송출할 앱들을 고릅니다. 마이크는 선택 사항이며 처음에는 앱 소리만 사용합니다. 목소리를 추가하려면 `송출 설정`에서 실제 마이크를 선택하세요.
+3. 메인 상단의 `믹스 시작`을 누릅니다. 시작할 수 없으면 메인 상태줄의 장치 안내를 확인하세요. 같은 버튼으로 중지할 수 있고, WAV 저장은 `송출 설정`에서 선택합니다.
 4. Discord 입력 장치로 **CABLE Output (VB-Audio Virtual Cable)**을 선택합니다. CABLE Input은 앱이 소리를 보내는 재생 측입니다.
 5. 앱과 마이크 게인을 조절합니다. WASAPI 송출과 선택적 WAV 저장은 48 kHz/stereo/PCM16입니다.
 
-기본 Windows 출력은 평소 스피커/헤드폰을 유지하세요. CABLE을 다른 앱의 출력으로도 지정하면 소리가 합쳐질 수 있습니다. 첫 화면의 프로그램 볼륨 슬라이더는 실제 Windows 오디오 세션 볼륨에 적용됩니다.
+기본 Windows 출력은 평소 스피커/헤드폰을 유지하세요. CABLE을 다른 앱의 출력으로도 지정하면 소리가 합쳐질 수 있습니다. 메인 믹서의 앱별 슬라이더·음소거는 캡처한 앱 신호에만 적용합니다. 앱의 Windows 세션 볼륨과 음소거 설정은 변경하지 않습니다. 추가·제거한 앱은 송출 중에도 믹스에 반영됩니다. 앱이 종료되면 해당 입력은 무음이 되며 같은 경로의 앱 재실행 시 다시 연결합니다.
 
-## 루프백으로 현재 소리 듣기
+## 송출 믹스를 스피커로 듣기
 
-메인 화면 아래 `현재 소리 확인`에서 `캡처 장치`와 `듣기 장치`를 선택하고 `루프백 듣기`를 누릅니다. 송출 중인 앱+마이크 믹스를 확인하려면 캡처 장치를 **CABLE Input**, 듣기 장치를 실제 헤드폰으로 선택하세요. Windows 출력 장치를 선택하면 그 장치에서 재생 중인 전체 소리를 캡처합니다. 듣기는 녹음·송출과 별도로 시작·중지합니다.
+메인 화면의 **`믹스 듣기`**를 켜면 가상 마이크로 보내는 최종 믹스를 **Windows 기본 스피커/헤드폰에도 동시에 재생**합니다. 캡처 장치나 CABLE을 따로 선택할 필요가 없습니다. 앱별 볼륨·음소거, 마이크 게인, 믹스 출력 마스터를 적용한 동일 오디오 블록을 사용합니다. 믹스 시작 전에 켜 두면 송출 시작 시 함께 재생합니다. `믹스 듣기 끄기`는 스피커 듣기만 중단합니다.
 
-반복 재생을 막기 위해 캡처와 듣기에 같은 장치를 사용할 수 없습니다. 출력 장치가 하나뿐이면 별도의 헤드폰/출력 장치가 필요합니다. `새로고침`으로 장치 목록을 갱신하고, 장치를 바꾸려면 먼저 `듣기 중지`를 누르세요. 마이크 사용 중에는 헤드폰을 권장합니다. 이 확인은 로컬 출력음 기준이며 Discord 수신 측 처리 결과는 포함하지 않습니다.
+Windows 기본 출력이 가상 마이크의 CABLE Input이면 듣기를 차단하고 안내합니다. 기본 출력을 실제 스피커로 바꾼 뒤 듣기를 껐다 켜세요. 장치 연결 실패는 가상 마이크 송출을 중단하지 않습니다. 스피커에 이미 원래 앱 소리가 재생 중이면 모니터 소리가 겹칠 수 있습니다. 마이크 사용 중에는 헤드폰을 권장합니다. 로컬 믹스를 확인하며 Discord 수신 측 처리 결과는 포함하지 않습니다.
 
 ## 끄면 어떻게 되나요?
 

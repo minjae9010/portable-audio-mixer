@@ -1,42 +1,125 @@
-# Portable Audio Mixer 0.5.1
+<p align="center">
+  <img src="assets/portable-mixer.png" width="112" alt="Portable Audio Mixer icon">
+</p>
+<h1 align="center">Portable Audio Mixer</h1>
+<p align="center"><strong>Mix your audio. Shape your sound.</strong></p>
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.5.1-a78bfa?style=flat-square" alt="Version 0.5.1">
+  <img src="https://img.shields.io/badge/platform-Windows_11_x64-60a5fa?style=flat-square" alt="Windows 11 x64">
+  <img src="https://img.shields.io/badge/audio-48_kHz_%C2%B7_stereo-5eead4?style=flat-square" alt="48 kHz stereo">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/source-MIT-a78bfa?style=flat-square" alt="Source license: MIT"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe"><img src="https://img.shields.io/badge/Download-PortableMixer.exe-7c3aed?style=for-the-badge&logo=windows&logoColor=white" alt="Download PortableMixer.exe"></a>
+</p>
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.ko.md">한국어</a> · <a href="README.ja.md">日本語</a> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-Windows 11 x64용 앱 오디오·마이크 믹서입니다. **기존 Microsoft 서명 VB-CABLE 드라이버**에 믹싱 결과를 보내 Discord 입력으로 사용합니다. 자체 드라이버 서명이나 Windows 테스트 모드는 필요하지 않습니다.
+---
 
-## 루프백 듣기
+## Your app audio and microphone, together
 
-메인 화면 아래 `현재 소리 확인`에서 캡처할 출력 장치와 별도의 듣기 장치를 선택한 뒤 `루프백 듣기`를 누릅니다. 송출 믹스는 `CABLE Input → 실제 헤드폰`으로 확인합니다. 같은 장치를 양쪽에 선택하면 시작하지 않으며, 듣기 중지는 녹음·송출을 중지하지 않습니다. 자세한 제한과 사용법은 [한국어 안내](README.ko.md)를 참고하세요.
+Mix your selected apps with your microphone and send the result to Discord through **VB-CABLE**. App faders and mute affect only the outgoing mix; they never change Windows app volume. Listen to the same final mix through your default speakers and optionally save it as WAV.
 
-## 사용
+| Mix | Control | Listen |
+|:---|:---|:---|
+| Multiple apps + microphone | Independent outgoing app gains | Hear the final mix through default speakers |
+| Optional WAV recording | Separate input gains | Start and stop listening independently |
 
-1. **[PortableMixer.exe](downloads/PortableMixer.exe) 하나만 다운로드**해 실행하고 UAC를 승인합니다.
-2. VB-CABLE이 없다면 첫 실행에서 내장 설치 안내가 표시됩니다. `예`를 누르면 공식 설치 창이 열립니다. `Install Driver`로 설치하고 설치 창을 닫으면 장치를 바로 비활성화한 뒤 앱을 종료합니다. 제조사가 재부팅을 안내했다면 재부팅하세요. 다음 앱 실행 때 장치가 활성화됩니다.
-3. 이미 VB-CABLE이 있으면 설치 안내 없이 앱이 장치를 활성화합니다. `녹음 / 입력 설정`에서 프로그램과 실제 마이크를 선택하고 `믹스 시작`을 누릅니다. WAV 저장은 선택 사항입니다.
-4. Discord의 입력 장치를 **CABLE Output (VB-Audio Virtual Cable)**으로 선택합니다.
-5. 앱 창의 X 또는 종료 메뉴로 종료하면 VB-CABLE 장치 전체가 비활성화됩니다. 다음 실행에서 활성화됩니다.
+> [!IMPORTANT]
+> The bundled VB-CABLE installer requires your consent and administrator access. Real VB-CABLE activation, WASAPI output, and Discord reception have **not yet been verified on the test PC**. See [validation](#validation) before relying on this workflow.
 
-별도 ZIP 다운로드나 실행 시 네트워크 연결은 필요하지 않습니다. 공식 Pack45의 모든 파일과 원본 readme를 EXE 리소스에 포함합니다. 설치는 사용자가 동의한 경우에만 진행하며, 취소하면 볼륨 믹서를 사용할 수 있습니다. `VB-CABLE 설치 / 안내` 버튼으로 다시 진행할 수 있습니다.
+## Quick start
 
-앱은 WASAPI shared-mode 48 kHz/stereo PCM16으로 보냅니다. Windows 기본 출력 장치를 CABLE로 바꿀 필요가 없습니다. 같은 CABLE에 다른 앱이 출력하면 그 소리도 전달될 수 있으므로 이 앱 전용으로 사용하세요. 첫 화면의 볼륨 슬라이더는 Windows 세션 볼륨을 제어합니다.
+1. **[Download PortableMixer.exe](https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe)**, run it on Windows 11 x64, and approve the UAC prompt.
+2. If VB-CABLE is missing, select `예` (Yes) to open the bundled official installer, then choose **Install Driver**. After the installer closes, the app disables the device and exits. Reboot if the manufacturer requests it, then launch the app again.
+3. Add apps with `앱 추가` (Add App), then click **`믹스 시작` (Start Mix) on the main screen**. A microphone is optional and starts disabled. Add one or enable WAV recording through `송출 설정` (Output Settings). If startup is blocked, check the device status on the main screen.
+4. In Discord, select **CABLE Output (VB-Audio Virtual Cable)** as the input device.
+5. Close the app with **X** or **Exit** to disable the VB-CABLE device. The next launch enables it again.
 
-## 장치 연결과 해제
+The EXE includes the complete official Pack45 package and its original readme; no separate ZIP download or runtime network connection is needed. Declining installation lets you continue using the volume mixer. Use `VB-CABLE 설치 / 안내` (VB-CABLE Installation / Guide) to try again later. The app UI currently uses Korean labels.
 
-- 정상 종료 및 부모 앱 비정상 종료를 감시하는 별도 프로세스가 장치를 비활성화합니다. 두 프로세스 모두 같은 EXE입니다.
-- 최소화/트레이 숨김은 실행 중이므로 연결을 유지합니다. 송출 중지는 오디오만 멈춥니다.
-- 비활성화는 Windows PnP 장치 단위로 수행합니다. 음소거만 하는 방식이 아닙니다. 캡처와 재생 장치가 함께 비활성화됩니다.
-- Discord 등 앱의 장치 목록 갱신에는 시간이 걸릴 수 있고, 비활성 장치 표시를 켠 Windows 설정/장치 관리자에는 항목이 남습니다. 드라이버 패키지를 매번 삭제하지 않습니다.
-- 앱과 감시 프로세스를 동시에 강제 종료하거나 전원이 끊기면 정리 코드를 실행할 수 없습니다. 이 경우 앱을 다시 실행한 뒤 종료하거나 장치 관리자에서 수동 비활성화하세요.
-- 표준 VB-CABLE 한 개만 지원합니다. A/B/C/D, Voicemeeter 및 다른 가상/실제 장치는 제어하지 않습니다. 식별자가 맞는 장치가 여러 개면 실행을 중단합니다.
+### Audio path
 
-## 검증 상태
+```text
+App audio + microphone
+          │
+     Portable Mixer ──────► WAV file (optional)
+          │
+      CABLE Input         playback side
+          │
+      CABLE Output        recording side
+          │
+        Discord
+```
 
-앱 빌드와 믹서/WAV/PCM 테스트, 장치 수명 모의 테스트 9개, 내장 파일 31개의 원본 SHA256 대조 테스트가 통과했습니다. 공식 Pack45의 Windows 10/11 x64 카탈로그에서 Microsoft 서명 유효성을 확인했습니다. **내장 설치 프로그램 실행 및 현재 PC의 VB-CABLE 설치는 하지 않았으므로 실제 장치 활성화·해제, WASAPI 송출과 Discord 수신은 미검증입니다.**
+Output uses WASAPI shared mode at **48 kHz / stereo / PCM16**. Keep your usual speakers or headphones as the Windows default output. Main-screen app faders and mute change only each captured contribution to the mix, preserving the original Windows session settings. Apps can be added or removed while mixing; closed inputs become silent and reconnect after the same app restarts. Other apps sending directly to CABLE can also be heard at its capture endpoint.
 
-[한국어 상세 안내](README.ko.md) · [검증 절차](docs/VIRTUAL_CABLE.ko.md) · [체크섬](downloads/SHA256SUMS.txt)
+## Hear your current audio
 
-## 빌드 및 라이선스
+Turn on **`믹스 듣기` (Listen to Mix)** to send the exact final mix block to the Windows default speakers as well as the virtual microphone. App gains, mute, microphone gain, and the output master all apply. No capture-device selection is needed. You can enable it before starting the mix; turning it off only stops speaker monitoring.
 
-Visual Studio 2022 C++ Build Tools, Windows SDK, CMake로 `./scripts/build-windows.ps1`을 실행합니다. 현재 앱 빌드에는 WDK가 필요 없습니다. 저장소의 원본 `downloads/VBCABLE_Driver_Pack45.zip`을 SHA256으로 확인하고 빌드 시 리소스로 포함합니다. 배포 시에는 EXE만 전달하면 됩니다.
+If the Windows default output is the same virtual-cable endpoint, monitoring is blocked. Choose physical speakers as the Windows default and toggle listening off and on. Speaker failure does not stop virtual-microphone output. Original app playback may overlap the monitored mix when both use the same speakers. This monitors local audio before Discord processing.
 
-앱 소스는 [MIT](LICENSE)입니다. **VB-CABLE은 VB-Audio의 별도 Donationware 제품**이며 이 프로젝트의 MIT 라이선스에 포함되지 않습니다. 유용하게 사용한다면 [기부/라이선스 구매](https://shop.vb-audio.com/en/win-apps/11-vb-cable.html)를 해 주세요. [제조사 라이선스 및 배포 조건](https://vb-audio.com/Services/licensing.htm)을 따릅니다.
+## Device lifecycle
 
-`driver/`와 `downloads/driver/`에는 이전 0.3 전용 드라이버 실험 소스 및 서명 전 패키지가 보존되어 있습니다. **현재 앱은 해당 드라이버를 사용하지 않으므로 설치하지 마세요.** 초기 WAV 프로토타입 문서와 이전 UI 검증 기록은 각 당시의 범위를 설명합니다.
+| Action | What happens |
+|:---|:---|
+| Launch the app | Enables the standard VB-CABLE device |
+| Stop the mix | Stops audio; keeps the device enabled |
+| Minimize / hide to tray | Keeps the app and device active |
+| Close with X / Exit | Stops audio and disables the device |
+| Main app crashes | A separate watcher attempts to disable the device |
+
+<details>
+<summary><strong>Device behavior and recovery details</strong></summary>
+
+- Disabling operates on the Windows PnP device, including playback and recording endpoints. It is more than muting audio.
+- The driver package stays installed. Disabled entries can remain in Device Manager or Windows settings, and Discord may take time to refresh its list.
+- If both the app and its watcher are killed, or power is lost, cleanup cannot run. Relaunch and exit the app, or disable the device manually in Device Manager.
+- Only one standard VB-CABLE is supported. CABLE A/B/C/D, Voicemeeter, and other devices are not controlled. Multiple matching devices cause startup to stop.
+- Other programs sharing this VB-CABLE also lose access when this app disables it.
+
+</details>
+
+## Validation
+
+These are recorded project results, not new hardware tests performed for this documentation update.
+
+| Check | Recorded result |
+|:---|:---|
+| Windows app build | Passed |
+| Mixer / WAV / PCM core tests | Passed |
+| Device lifecycle simulations | 9 scenarios passed |
+| Bundled package integrity | 31 files matched original sizes and SHA256 hashes |
+| Official Pack45 Windows 10/11 x64 catalog | Microsoft signature verified |
+| Bundled installer execution on the test PC | **Not tested** |
+| Actual device activation / deactivation, WASAPI output, Discord reception | **Not verified** |
+
+[Hardware validation procedure (Korean)](docs/VIRTUAL_CABLE.ko.md) · [Download checksums](downloads/SHA256SUMS.txt)
+
+## Build
+
+Use Visual Studio 2022 C++ Build Tools, Windows SDK, and CMake. Run from the repository root in Developer PowerShell:
+
+```powershell
+.\scripts\build-windows.ps1
+```
+
+The current app build does not require the WDK. The build checks the original `downloads/VBCABLE_Driver_Pack45.zip` using SHA256 and embeds it as a resource. Distribute the EXE.
+
+## Documentation and licensing
+
+- [Detailed Korean guide](README.ko.md)
+- [VB-CABLE verification procedure (Korean)](docs/VIRTUAL_CABLE.ko.md)
+- [Release notes (Korean)](docs/EXE_RELEASE.ko.md)
+
+App source is licensed under [MIT](LICENSE). **VB-CABLE is a separate VB-Audio Donationware product**, excluded from this project's MIT license. See the manufacturer's [licensing and distribution terms](https://vb-audio.com/Services/licensing.htm) and [donation / license purchase page](https://shop.vb-audio.com/en/win-apps/11-vb-cable.html).
+
+<details>
+<summary>Legacy driver experiments</summary>
+
+`driver/` and `downloads/driver/` preserve the earlier 0.3 custom-driver experiment and unsigned packages. **The current app does not use them; do not install them.** Older WAV prototype documents and UI validation records describe their respective historical versions.
+
+</details>

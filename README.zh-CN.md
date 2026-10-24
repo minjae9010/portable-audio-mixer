@@ -1,83 +1,106 @@
-# Portable Audio Mixer
+<p align="center">
+  <img src="assets/portable-mixer.png" width="112" alt="Portable Audio Mixer icon">
+</p>
+<h1 align="center">Portable Audio Mixer</h1>
+<p align="center"><strong>将应用声音与人声，混合为一路音频。</strong></p>
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.5.1-a78bfa?style=flat-square" alt="Version 0.5.1">
+  <img src="https://img.shields.io/badge/platform-Windows_11_x64-60a5fa?style=flat-square" alt="Windows 11 x64">
+  <img src="https://img.shields.io/badge/audio-48_kHz_%C2%B7_stereo-5eead4?style=flat-square" alt="48 kHz stereo">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/source-MIT-a78bfa?style=flat-square" alt="Source license: MIT"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe"><img src="https://img.shields.io/badge/Download-PortableMixer.exe-7c3aed?style=for-the-badge&logo=windows&logoColor=white" alt="Download PortableMixer.exe"></a>
+</p>
+<p align="center">
+  <a href="README.md">English</a> · <a href="README.ko.md">한국어</a> · <a href="README.ja.md">日本語</a> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-[English](README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · 简体中文
+---
 
-面向 Windows 11 x64、使用 C++17 开发的原生音频采集与混音原型。默认 README 使用英语。
+## 将应用声音与麦克风混合输出
 
-**启动后的主界面是按应用划分的音量混音器。** 它显示具有 Windows 音频会话的应用，并直接调整各应用的音量和静音状态。打开 `녹음 / 입력 설정`（录音 / 输入设置），即可同时采集选定的进程树和麦克风，混音后保存为 WAV 文件，也可选择通过 RTP/UDP 发送到同一台电脑上的接收应用。
+混合添加的多个应用与麦克风，通过 **VB-CABLE** 发送到 Discord。音量和静音仅影响发送的混音，不会更改 Windows 应用音量。同一最终混音也可通过默认扬声器播放，并可选保存为 WAV。
 
-**此便携版使用流程不支持直接输出到 Discord 的普通麦克风输入。** 它不会安装虚拟音频设备或服务。控制多个应用的音量不等于同时录制多个选定的应用；后者以及 MP4 直播推流尚未实现。
+| 混音 | 控制 | 监听 |
+|:---|:---|:---|
+| 多个应用 + 麦克风 | 各应用发送音量 | 用默认扬声器监听最终混音 |
+| 可选 WAV 录音 | 各输入独立增益 | 独立开始和停止监听 |
 
-## 功能
+> [!IMPORTANT]
+> 内置 VB-CABLE 安装程序需要用户同意和管理员权限。实际设备启用、WASAPI 输出与 Discord 接收在测试电脑上仍 **未经验证**。
 
-- 按应用调整 Windows 音频会话音量（0–100%）和静音状态。
-- 通过 WASAPI Process Loopback 采集指定 PID 及其子进程树。
-- 同时以共享模式采集选定的麦克风。
-- 每路录音输入支持 0–200% 增益，增益过渡时间为 10 ms。
-- QPC 时间戳对齐、削波限制及输入/输出峰值显示。
-- 原生 Win32 界面和系统托盘图标。
-- PCM16 / 双声道 / 48 kHz WAV 录音。
-- 可选的本地 RTP/UDP 输出（`127.0.0.1`，L16 / 双声道 / 48 kHz）。
-- 无需安装外部虚拟音频线，也不更改默认输出设备。主界面的混音器会直接更改 Windows 应用音量和静音设置。
+## 快速开始
 
-## 下载与使用
+1. **[下载 PortableMixer.exe](https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe)**，在 Windows 11 x64 上运行并批准 UAC 提示。
+2. 如果尚未安装 VB-CABLE，选择 `예`（是）打开内置官方安装程序，然后选择 **Install Driver**。安装窗口关闭后，应用会禁用设备并退出。如果厂商要求重启，请先重启，再次运行应用。
+3. 使用 `앱 추가`（添加应用）选择应用，然后点击主界面的 **`믹스 시작`（开始混音）**。麦克风为可选项，初始默认不使用。可在 `송출 설정`（输出设置）中添加麦克风或保存 WAV。如果无法开始，请查看主界面的设备状态。
+4. 将 Discord 输入设备设为 **CABLE Output (VB-Audio Virtual Cable)**。
+5. 通过 **X / 退出**关闭应用后，VB-CABLE 设备会被禁用，下次启动应用时重新启用。
 
-[**下载 PortableMixer.exe**](https://github.com/minjae9010/portable-audio-mixer/raw/refs/heads/main/downloads/PortableMixer.exe) · [SHA256 校验和](downloads/SHA256SUMS.txt)
+EXE 包含官方 Pack45 的所有文件和原始 readme，无需另行下载 ZIP，运行时也无需网络连接。取消安装后仍可使用音量混音器，可通过 `VB-CABLE 설치 / 안내`（VB-CABLE 安装 / 指南）重试。目前应用界面使用韩语。
 
-可执行文件适用于 Windows 11 **x64**。目前应用界面使用韩语；README 翻译不会改变界面语言。
+## 音频路径
 
-1. 运行程序。如果混音器中没有显示某个应用，请先让该应用播放声音，然后通过滑块和静音按钮进行调整。
-2. 如需录音，打开 `녹음 / 입력 설정`（录音 / 输入设置），选择目标进程和麦克风，并在 Windows 设置中允许桌面应用访问麦克风。
-3. 如需本地实时输出，启用 RTP 选项、设置端口，并在同一台电脑上启动接收应用。
-4. 点击 `녹음 시작`（开始录音）并选择 WAV 保存位置。点击 `중지 및 저장`（停止并保存）结束录音和 RTP 输出。
-5. 关闭或最小化窗口会将程序隐藏到系统托盘。使用 `종료`（退出）才能完全退出程序。
+```text
+应用 + 麦克风 → Portable Mixer → CABLE Input → CABLE Output → Discord
+                       └────→ WAV（可选）
+```
 
-## 验证状态与限制
+输出采用 WASAPI 共享模式、**48 kHz / 双声道 / PCM16**。Windows 默认输出保持为平时使用的扬声器或耳机。主界面的音量和静音仅调整混音中的对应输入，不会更改 Windows 会话音量。其他应用直接向同一个 CABLE 输出时，其声音也可能传送。
 
-以下内容来自项目已有的验证记录。本次文档翻译不代表重新执行了构建或硬件测试。
+## 监听当前声音
+
+打开 **`믹스 듣기`（监听混音）**，即可将发送给虚拟麦克风的同一最终混音同时播放到 Windows 默认扬声器。各应用音量、静音、麦克风增益和总输出音量都会反映到监听中，无需选择采集设备。
+
+关闭监听只停止扬声器播放，不影响录音和发送。如果默认输出与发送的虚拟 CABLE 相同，则拒绝监听；请将默认输出改为实体扬声器后重新开关监听。原应用声音与监听声音可能在同一扬声器上重叠。此功能不包含 Discord 接收端的处理结果。
+
+## 设备生命周期
+
+| 操作 | 行为 |
+|:---|:---|
+| 启动应用 | 启用标准 VB-CABLE |
+| 停止混音 | 仅停止音频，设备保持启用 |
+| 最小化 / 隐藏到托盘 | 保持连接 |
+| X / 退出 | 停止音频并禁用设备 |
+| 主程序异常退出 | 独立监视进程尝试禁用设备 |
+
+<details>
+<summary><strong>限制与恢复方法</strong></summary>
+
+禁用以 Windows PnP 设备为单位，包含播放端和录音端，并非仅静音。驱动包仍会保留，设备管理器等位置仍可能显示已禁用的设备。Discord 刷新设备列表可能需要时间。
+
+如果应用和监视进程同时被强制结束，或发生断电，就无法执行清理。请重新运行应用后退出，或在设备管理器中手动禁用。仅支持一个标准 VB-CABLE，不控制 A/B/C/D、Voicemeeter 或其他设备。匹配到多个设备时会停止启动。共享此 CABLE 的其他应用也会受到设备禁用的影响。
+
+</details>
+
+## 验证状态
+
+以下为已有项目记录，并非本次文档更新重新执行的硬件测试。
 
 | 检查项 | 结果 |
-|---|---|
-| Windows x64 可执行文件编译和链接 | 通过 — LLVM-MinGW 20261020 / Clang 23.1.4 |
-| PE 格式、清单和 DLL 依赖静态检查 | 通过 |
-| 核心混音器和 RTP 数据包测试 | 在 Windows 上原生运行通过 |
-| Linux UBSan / 独立 WAV 解析器 | 通过 |
-| Windows 混音器界面、应用音量和静音 | 已手动检查；具体范围见 [UI 验证记录（韩语）](docs/MIXER_UI.ko.md) |
-| MSVC 构建和核心 CTest | [此前的 Windows CI 已通过](https://github.com/minjae9010/portable-audio-mixer/actions/runs/40079787858)，不代表已验证当前所有更改 |
-| 实际 WASAPI 采集与 RTP 接收 | **尚未验证** |
-| 直接输出到 Discord 麦克风 | **不支持** |
-| 可执行文件数字签名 | 未签名 |
+|:---|:---|
+| Windows 构建、混音器 / WAV / PCM 测试 | 通过 |
+| 设备生命周期模拟 | 9 个场景通过 |
+| 内置文件大小与 SHA256 | 31 个文件与原始文件一致 |
+| 官方 Pack45 Windows 10/11 x64 目录文件 | Microsoft 签名已验证 |
+| 运行内置安装程序 | **尚未测试** |
+| 实际设备启用 / 禁用、WASAPI 输出、Discord 接收 | **尚未验证** |
 
-进程环回采集范围包含 **子进程树**，并非仅限单个 PID。输入数据包的到达余量为 80 ms，尚未实现长期时钟漂移的连续校正。启用蓝牙麦克风时，操作系统或驱动可能切换音频配置，应用无法阻止这一行为。
+[硬件验证步骤（韩语）](docs/VIRTUAL_CABLE.ko.md) · [校验和](downloads/SHA256SUMS.txt)
 
-## 从源码构建
+## 构建与许可证
 
-安装 Visual Studio 2022 C++ 工具、Windows SDK 22621 或更高版本以及 CMake 3.24 或更高版本。在仓库根目录的 Developer PowerShell 中运行：
+准备 Visual Studio 2022 C++ Build Tools、Windows SDK 和 CMake，在仓库根目录的 Developer PowerShell 中运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-windows.ps1
+.\scripts\build-windows.ps1
 ```
 
-脚本会构建项目并运行核心测试，输出文件为 `build\Release\PortableMixer.exe`。
+当前应用构建不需要 WDK。构建会用 SHA256 校验 `downloads/VBCABLE_Driver_Pack45.zip` 并将其嵌入资源，分发时仅需 EXE。
 
-在 Linux 上解压 LLVM-MinGW UCRT 工具链后运行：
+应用源码采用 [MIT](LICENSE) 许可证。**VB-CABLE 是 VB-Audio 独立的 Donationware 产品**，不包含在本项目的 MIT 许可中。请参阅厂商的 [许可与分发条款](https://vb-audio.com/Services/licensing.htm) 及 [捐赠 / 购买许可页面](https://shop.vb-audio.com/en/win-apps/11-vb-cable.html)。
 
-```bash
-LLVM_MINGW_ROOT=/absolute/path/to/llvm-mingw \
-  bash scripts/build-cross-linux.sh
-```
+`driver/` 和 `downloads/driver/` 保留了旧版 0.3 实验驱动，当前应用不使用它们，请勿安装。旧文档中的验证结果仅适用于当时版本。
 
-输出文件为 `build-cross/PortableMixer.exe`。构建成功并不代表实际音频采集或 RTP 接收已通过验证。
-
-## 文档
-
-- [详细指南（韩语）](README.ko.md)
-- [混音器界面与手动验证（韩语）](docs/MIXER_UI.ko.md)
-- [本地 RTP 输出与接收示例（韩语）](README.ko.md#실행-절차)
-- [技术可行性、限制与参考资料（韩语）](docs/FEASIBILITY.ko.md)
-- [此前的验证结果（韩语）](docs/VALIDATION.ko.md)
-- [Windows 硬件测试计划](docs/WINDOWS_TEST_PLAN.md)
-
-## 许可证
-
-项目源码采用 [MIT License](LICENSE)。静态链接运行库的相关声明位于 [third_party_licenses](third_party_licenses/)。
+[韩语详细指南](README.ko.md) · [发布说明（韩语）](docs/EXE_RELEASE.ko.md)
