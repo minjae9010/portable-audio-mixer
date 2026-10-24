@@ -1,0 +1,17 @@
+name: Windows build and core tests
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Core tests (not WASAPI hardware tests)
+        run: ctest --test-dir build -C Release --output-on-failure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PortableMixer-win-x64-unverified-audio
+          path: build/Release/PortableMixer.exe

@@ -1,0 +1,2 @@
+Built Windows x64 GUI: build-cross/PortableMixer.exe
+Built Windows core tests (not executed here): build-cross/mixer_core_tests.exe

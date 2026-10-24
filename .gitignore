@@ -1,0 +1,9 @@
+build/
+build-cross/
+verification/
+*.wav
+*.exe
+*.pdb
+*.obj
+
+!downloads/PortableMixer.exe
