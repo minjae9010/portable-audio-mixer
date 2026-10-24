@@ -12,6 +12,7 @@ class MixMonitor {
     HANDLE wake_{};
     std::thread worker_;
     std::atomic<bool> stopping_{false}, running_{false}, failed_{false};
+    std::atomic<unsigned> revision_{0};
     mutable std::mutex mutex_;
     std::wstring text_;
     std::array<mix::Block, 4> queue_{};

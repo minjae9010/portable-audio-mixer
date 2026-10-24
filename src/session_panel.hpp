@@ -4,16 +4,17 @@
 #include "ui_theme.hpp"
 #include "app_icons.hpp"
 #include "brand.hpp"
-#include "loopback_controls.hpp"
+#include "mix_monitor.hpp"
+#include "mix_inputs.hpp"
 #include "added_programs.hpp"
 #include <commctrl.h>
 #include <array>
 #include <cwctype>
 
-// Windows session-volume controls are independent of the recording mixer.
+// Every fader controls only this application's outgoing audio mix.
 class SessionPanel {
 public:
-    static constexpr int Width = 640, Height = 706;
+    static constexpr int Width = 640, Height = 654;
 private:
     static constexpr COLORREF Canvas = RGB(19, 22, 30), Card = RGB(29, 33, 44);
     static constexpr COLORREF Border = RGB(43, 49, 64), Text = RGB(236, 239, 247), Dim = RGB(139, 149, 171);
@@ -36,7 +37,19 @@ private:
     struct Strip { HWND slider{}, mute{}, label{}, remove{}; };
     std::array<Strip, 4> strips_{};
     HWND previous_{}, next_{};
-    LoopbackControls loopback_;
+    MixMonitor* monitor_{};
+    mix::Inputs* inputs_{};
+    HWND listenButton_{}, listenStatus_{};
+    HWND mixToggle_{};
+    bool running_=false;
+    std::wstring runStatus_=L"앱을 추가한 뒤 믹스 시작을 누르세요.";
+    void syncMonitor() {
+        const wchar_t* label = monitor_->enabled.load() ? L"■ 믹스 듣기 끄기" : L"▶ 믹스 듣기";
+        wchar_t previous[512]{}; GetWindowTextW(listenButton_, previous, 512);
+        if (wcscmp(label, previous)) SetWindowTextW(listenButton_, label);
+        auto status = monitor_->statusText(); GetWindowTextW(listenStatus_, previous, 512);
+        if (status != previous) SetWindowTextW(listenStatus_, status.c_str());
+    }
     size_t page_ = 0;
     unsigned tick_ = 0;
     bool dragging_ = false;
@@ -72,7 +85,8 @@ private:
     void controls() {
         make(L"BUTTON", L"+ 앱 추가", WS_TABSTOP, 20, 84, 112, 32, 1);
         make(L"BUTTON", L"새로고침", WS_TABSTOP, 142, 84, 86, 32, 2);
-        make(L"BUTTON", L"녹음 설정", WS_TABSTOP, 420, 84, 96, 32, Record);
+        mixToggle_=make(L"BUTTON", L"▶ 믹스 시작", WS_TABSTOP, 238, 84, 172, 32, 904);
+        make(L"BUTTON", L"송출 설정", WS_TABSTOP, 420, 84, 96, 32, Record);
         make(L"BUTTON", L"방송 설정", WS_TABSTOP, 526, 84, 94, 32, Broadcast);
         for (int i = 0; i < 4; ++i) {
             const int x = 20 + i * 153;
@@ -87,7 +101,9 @@ private:
         }
         previous_ = make(L"BUTTON", L"‹", WS_TABSTOP, 526, 460, 40, 28, 3);
         next_ = make(L"BUTTON", L"›", WS_TABSTOP, 580, 460, 40, 28, 4);
-        loopback_.create(hwnd_);
+        listenButton_ = make(L"BUTTON", L"▶ 믹스 듣기", WS_TABSTOP, 440, 531, 180, 30, 70);
+        listenStatus_ = make(L"STATIC", L"", SS_LEFT, 20, 572, 600, 24, 73);
+        syncMonitor();
     }
     void refresh() {
         std::vector<sessions::Channel> next;
@@ -96,6 +112,9 @@ private:
         // Preserve the first visible channel across additions/removals when possible.
         std::wstring anchor = page_*AppSlots < channels_.size() ? channels_[page_*AppSlots].id : L"";
         channels_ = added_.reconcile(next);
+        std::vector<mix::Input> inputs;
+        for(const auto& c:channels_) inputs.push_back({c.id,c.pids,c.inputControl});
+        inputs_->set(std::move(inputs));
         icons_.clear();
         for (const auto& channel : channels_) {
             auto& icon=selectedIcons_[channel.id];
@@ -180,7 +199,7 @@ private:
         text(dc,L"Volume mixer",rect(66,18,350,32),titleFont_,Text);
         text(dc,L"내 앱의 소리를, 한곳에서.",rect(67,50,340,20),small,Dim);
         round(dc,rect(534,28,86,24),RGB(29,47,45),12,RGB(29,47,45));
-        text(dc,master_.output && master_.output->active.load() ? L"●  송출 중" : L"●  준비",rect(534,28,86,24),small,RGB(108,215,195),DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+        text(dc,master_.output && master_.output->active.load() ? L"●  송출 중" : running_ ? L"●  연결 중" : L"●  대기",rect(534,28,86,24),small,RGB(108,215,195),DT_CENTER|DT_VCENTER|DT_SINGLELINE);
         for(size_t i=0;i<strips_.size();++i) {
             int x=20+static_cast<int>(i)*153; size_t index=page_*AppSlots+i;
             auto* channel=channelAt(i); if(!channel) continue;
@@ -217,13 +236,13 @@ private:
         auto pagination=std::to_wstring(page_+1)+L" / "+std::to_wstring(pages);
         text(dc,pagination.c_str(),rect(444,461,66,24),small,Dim,DT_RIGHT|DT_SINGLELINE|DT_VCENTER);
         fill(dc,rect(20,496,600,1),Border);
-        text(dc,error_.empty() ? L"믹스 출력은 합쳐서 송출하는 소리와 녹음 파일의 최종 볼륨입니다." : error_.c_str(),
+        text(dc,error_.empty() ? runStatus_.c_str() : error_.c_str(),
             rect(20,504,600,20),small,error_.empty() ? Dim : RGB(246,172,186),DT_SINGLELINE|DT_END_ELLIPSIS);
-        text(dc,L"현재 소리 확인",rect(20,533,400,28),nameFont_,Text);
-        text(dc,L"캡처 장치",rect(20,571,90,28),small,Dim,DT_SINGLELINE|DT_VCENTER);
-        text(dc,L"듣기 장치",rect(20,609,90,28),small,Dim,DT_SINGLELINE|DT_VCENTER);
-        text(dc,L"송출음 확인: CABLE Input 선택 · 마이크 사용 중에는 헤드폰 권장",
-            rect(20,678,600,20),small,Dim,DT_SINGLELINE|DT_END_ELLIPSIS);
+        text(dc,L"송출 중인 믹스를 스피커로 듣기",rect(20,533,400,28),nameFont_,Text);
+        text(dc,L"최종 볼륨·음소거까지 동일하게 적용 · 마이크 사용 중에는 헤드폰 권장",
+            rect(20,602,600,20),small,Dim,DT_SINGLELINE|DT_END_ELLIPSIS);
+        text(dc,L"앱별 슬라이더는 송출 볼륨만 조절하며 Windows 앱 볼륨은 유지합니다.",
+            rect(20,626,600,20),small,Dim,DT_SINGLELINE|DT_END_ELLIPSIS);
     }
     LRESULT message(UINT msg, WPARAM wp, LPARAM lp) {
         switch (msg) {
@@ -236,8 +255,7 @@ private:
             break;
         }
         case WM_TIMER:
-            loopback_.sync();
-            if (!IsWindowVisible(hwnd_)) return 0;
+            syncMonitor();
             if (++tick_ % 20 == 0 && !dragging_) refresh(); else {
                 sync(); RECT r = ui::rect(20, 238, 600, 158); InvalidateRect(hwnd_, &r, FALSE);
             }
@@ -252,7 +270,8 @@ private:
             return 0;
         case WM_COMMAND: {
             int id = LOWORD(wp);
-            if (id == 70) { loopback_.toggle(); return 0; }
+            if (id == 904) { SendMessageW(GetParent(hwnd_),WM_COMMAND,904,0); return 0; }
+            if (id == 70) { monitor_->enable(!monitor_->enabled.load()); syncMonitor(); return 0; }
             if (id == Record || id == Broadcast) { SendMessageW(GetParent(hwnd_), WM_COMMAND, id, 0); return 0; }
             if (id == 1) {
                 mixer_dialogs::Program selected;
@@ -262,7 +281,7 @@ private:
                     refresh();
                     for (size_t i = 0; i < channels_.size(); ++i) if (channels_[i].id == selected.key) { page_ = i/AppSlots; break; }
                 }
-            } else if (id == 2) { refresh(); loopback_.refresh(); }
+            } else if (id == 2) refresh();
             else if (id == 3 && page_) --page_;
             else if (id == 4 && (page_+1)*AppSlots < channels_.size()) ++page_;
             else if(id>=50 && id<53 && page_*AppSlots+id-50<channels_.size()) {
@@ -289,7 +308,7 @@ private:
             BitBlt(dc, 0, 0, r.right, r.bottom, buffer, 0, 0, SRCCOPY);
             SelectObject(buffer, old); DeleteObject(bitmap); DeleteDC(buffer); EndPaint(hwnd_, &ps); return 0;
         }
-        case WM_DESTROY: KillTimer(hwnd_, 1); loopback_.stop(); channels_.clear(); return 0;
+        case WM_DESTROY: KillTimer(hwnd_, 1); monitor_->enable(false); channels_.clear(); return 0;
         }
         return DefWindowProcW(hwnd_, msg, wp, lp);
     }
@@ -302,25 +321,38 @@ private:
         return self ? self->message(msg, wp, lp) : DefWindowProcW(h, msg, wp, lp);
     }
 public:
+    void setRunState(bool running,const std::wstring& status) {
+        const bool changed=running_!=running || runStatus_!=status;
+        running_=running; runStatus_=status;
+        const wchar_t* label=running ? L"■ 믹스 중지" : L"▶ 믹스 시작";
+        wchar_t old[100]{}; GetWindowTextW(mixToggle_,old,100);
+        if(wcscmp(old,label)) SetWindowTextW(mixToggle_,label);
+        if(changed) {
+            RECT r=ui::rect(20,498,600,30); InvalidateRect(hwnd_,&r,FALSE);
+            r=ui::rect(534,28,86,24); InvalidateRect(hwnd_,&r,FALSE);
+        }
+    }
     ~SessionPanel() {
         for(auto f : {titleFont_, valueFont_, nameFont_}) if(f) DeleteObject(f);
         DeleteObject(cardBrush_);
     }
-    HWND create(HWND owner, mix::OutputControl& output) {
+    HWND create(HWND owner, mix::OutputControl& output, MixMonitor& monitor, mix::Inputs& inputs) {
+        monitor_ = &monitor;
+        inputs_ = &inputs;
         master_.master=true; master_.id=L"<mix-output>"; master_.name=L"믹스 출력"; master_.output=&output;
         WNDCLASSW wc{}; wc.lpfnWndProc = proc; wc.hInstance = GetModuleHandleW(nullptr);
         wc.lpszClassName = L"PortableMixerSessionPanel"; wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         RegisterClassW(&wc);
-        return CreateWindowExW(WS_EX_CONTROLPARENT, wc.lpszClassName, L"Windows 프로그램 볼륨 믹서", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+        return CreateWindowExW(WS_EX_CONTROLPARENT, wc.lpszClassName, L"송출 오디오 믹서", WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
             0, 0, ui::px(Width), ui::px(Height), owner, nullptr, wc.hInstance, this);
     }
     void dpiChanged() {
-        loopback_.sync();
+        syncMonitor();
         // Recreate only controls, retaining COM sessions and current page.
         HWND child = GetWindow(hwnd_, GW_CHILD);
         while (child) { HWND next = GetWindow(child, GW_HWNDNEXT); DestroyWindow(child); child = next; }
         fonts();
         SetWindowPos(hwnd_, nullptr, 0, 0, ui::px(Width), ui::px(Height), SWP_NOZORDER);
-        controls(); sync(); InvalidateRect(hwnd_, nullptr, TRUE);
+        controls(); sync(); setRunState(running_,runStatus_); InvalidateRect(hwnd_, nullptr, TRUE);
     }
 };

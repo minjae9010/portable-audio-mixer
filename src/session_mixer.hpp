@@ -5,6 +5,7 @@
 #include <endpointvolume.h>
 #include "session_meter_compat.hpp"
 #include "mix_output.hpp"
+#include <memory>
 #include <functiondiscoverykeys_devpkey.h>
 #include <wrl/client.h>
 #include <algorithm>
@@ -21,6 +22,8 @@ struct Channel {
     std::vector<ComPtr<ISimpleAudioVolume>> volumes;
     std::vector<ComPtr<IAudioMeterInformation>> meters;
     mix::OutputControl* output=nullptr;
+    std::shared_ptr<mix::OutputControl> inputControl;
+    std::vector<uint32_t> pids;
     bool master = false;
     bool playing = false;
     float level = 1, peak = 0;
@@ -31,7 +34,11 @@ struct Channel {
         if(output) {
             level=std::clamp(mix::finiteSample(output->gain.load()),0.0f,1.0f); muted=output->muted.load();
             playing=output->active.load(); peak=playing ? output->peak.load() : 0;
-            device=playing ? L"가상 마이크 · 송출 중" : L"믹스 송출 대기";
+            device=master ? (playing ? L"가상 마이크 · 송출 중" : L"송출 시작 전")
+                          : !output->armed.load() ? L"송출 시작 전"
+                          : output->failed.load() ? L"프로그램 캡처 오류"
+                          : playing ? L"프로그램 캡처 중"
+                          : pids.empty() ? L"프로그램 오디오 없음" : L"프로그램 연결 중";
             return;
         }
         float sum = 0; unsigned count = 0;
@@ -45,15 +52,11 @@ struct Channel {
     }
     HRESULT setLevel(float value) {
         if(output) { output->gain=std::clamp(mix::finiteSample(value),0.0f,1.0f); read(); return S_OK; }
-        HRESULT result = S_OK;
-        for (auto& v : volumes) { HRESULT hr = v->SetMasterVolume(value, nullptr); if (FAILED(hr)) result = hr; }
-        read(); return result;
+        return E_ACCESSDENIED;
     }
     HRESULT setMute(bool value) {
         if(output) { output->muted=value; read(); return S_OK; }
-        HRESULT result = S_OK;
-        for (auto& v : volumes) { HRESULT hr = v->SetMute(value, nullptr); if (FAILED(hr)) result = hr; }
-        read(); return result;
+        return E_ACCESSDENIED;
     }
 };
 inline std::wstring processPath(DWORD pid) {

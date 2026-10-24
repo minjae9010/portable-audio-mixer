@@ -16,9 +16,10 @@ flags=(-std=c++17 -Os -Wall -Wextra -Wpedantic -Werror -ffunction-sections -fdat
 "$compiler" "${flags[@]}" -c "$project_root/src/main.cpp" -o "$build_root/main.o"
 "$compiler" "${flags[@]}" -c "$project_root/src/audio_engine.cpp" -o "$build_root/audio_engine.o"
 "$toolchain_root/bin/llvm-rc" "/I$project_root/src" "/FO$build_root/app.res" "$project_root/src/app.rc"
+"$toolchain_root/bin/llvm-rc" "/I$project_root/src" "/FO$build_root/brand.res" "$project_root/src/brand.rc"
 "$compiler" -static -municode -mwindows \
   -Wl,--gc-sections,--dynamicbase,--nxcompat,--high-entropy-va,--no-insert-timestamp,--strip-all \
-  "$build_root/main.o" "$build_root/audio_engine.o" "$build_root/app.res" \
+  "$build_root/main.o" "$build_root/audio_engine.o" "$build_root/app.res" "$build_root/brand.res" \
   -lole32 -luuid -lmmdevapi -lavrt -lcomctl32 -lcomdlg32 -lshell32 -luser32 -lgdi32 \
   -o "$build_root/PortableMixer.exe"
 "$compiler" -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -static \

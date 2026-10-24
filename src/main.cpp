@@ -22,7 +22,6 @@ using Microsoft::WRL::ComPtr;
 namespace {
 constexpr int AddProgram = 400, BroadcastSetup = 401;
 HWND addProgramButton{}, selectedProgramLabel{};
-mixer_dialogs::Program selectedProgram;
 mixer_dialogs::BroadcastSettings broadcastSettings;
 SessionPanel sessionPanel;
 HWND sessionPanelWindow{}, backToMixer{};
@@ -106,6 +105,9 @@ void refresh() {
         if (std::to_wstring(processes[i].pid) == selectedPid) SendMessageW(procCombo, CB_SETCURSEL, i, 0);
     SendMessageW(procCombo, CB_SETCUEBANNER, 0, reinterpret_cast<LPARAM>(L"녹음할 앱을 선택하세요"));
     microphones.clear(); SendMessageW(micCombo, CB_RESETCONTENT, 0, 0);
+    microphones.push_back({L"",L"마이크 사용 안 함 · 앱 소리만 믹스"});
+    SendMessageW(micCombo,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(microphones.front().name.c_str()));
+    SendMessageW(micCombo,CB_SETCURSEL,0,0);
     ComPtr<IMMDeviceEnumerator> enumerator; ComPtr<IMMDeviceCollection> collection;
     if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator))) ||
         FAILED(enumerator->EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE, &collection))) return;
@@ -143,18 +145,21 @@ void updateGains() {
 void update() {
     bool active = engine->active.load();
     if (active && (!virtualDevice || !virtualDevice->ready())) { engine->stop(); active = false; }
-    EnableWindow(addProgramButton, !active);
+    EnableWindow(addProgramButton, TRUE);
+    const auto inputCount=engine->inputs.snapshot().size();
+    SetWindowTextW(selectedProgramLabel,(L"믹서 입력 "+std::to_wstring(inputCount)+L"개 · 모두 송출").c_str());
+    SetWindowTextW(addProgramButton,L"믹서에서 앱 편집");
     const auto status = engine->statusText();
     const bool recording = active && status.rfind(L"Mixing", 0) == 0;
     if (recording && !wasActive) { recordingStart = GetTickCount64(); elapsed = 0; }
     if (wasActive || recording) elapsed = GetTickCount64() - recordingStart;
     wasActive = recording;
     for (HWND c : {pidEdit, procCombo, micCombo, refreshButton, recordCheck}) EnableWindow(c, !active);
-    EnableWindow(startButton, !active && virtualDevice && virtualDevice->ready());
+    EnableWindow(startButton, !active);
     if (virtualDevice) SetWindowTextW(virtualStatus, virtualDevice->status().c_str());
     EnableWindow(stopButton, active);
     std::wstring friendly = status;
-    if (status.rfind(L"Idle.", 0) == 0) friendly = L"앱과 마이크를 선택한 뒤 녹음을 시작하세요.";
+    if (status.rfind(L"Idle.", 0) == 0) friendly = L"앱을 추가하고 믹스 시작을 누르세요. 마이크는 선택 사항입니다.";
     else if (status == L"Starting capture...") friendly = L"오디오 입력을 연결하고 있습니다…";
     else if (status.rfind(L"Mixing", 0) == 0) friendly = status == L"Mixing to virtual microphone and WAV." ? L"가상 마이크 송출 중 · WAV 파일도 저장하고 있습니다." : L"가상 마이크 송출 중 · Discord에서 입력 장치를 선택하세요.";
     else if (status == L"Stopped. WAV finalized.") friendly = L"녹음 완료 · WAV 파일을 저장했습니다.";
@@ -165,6 +170,8 @@ void update() {
     int len = GetWindowTextLengthW(statusLabel);
     std::wstring old(static_cast<size_t>(len)+1, L'\0'); GetWindowTextW(statusLabel, old.data(), len+1); old.resize(len);
     if (old != friendly) SetWindowTextW(statusLabel, friendly.c_str());
+    if(sessionPanelWindow) sessionPanel.setRunState(active,
+        !active && virtualDevice && !virtualDevice->ready() ? virtualDevice->status() : friendly);
     wchar_t meter[450]{};
     swprintf_s(meter, L"Peaks  App %.0f%% | Mic %.0f%% | Mix %.0f%%\nClipped %llu | Late %llu | Empty %llu | Overflow %llu\nDiscontinuities %llu | Timestamp fallbacks %llu",
         engine->processPeak.load()*100, engine->micPeak.load()*100, engine->outputPeak.load()*100,
@@ -202,17 +209,17 @@ void trayMenu() {
     PostMessageW(window, WM_NULL, 0, 0); DestroyMenu(menu);
 }
 void begin() {
-    wchar_t pidText[40]{}; GetWindowTextW(pidEdit, pidText, 40);
-    wchar_t* end = nullptr; const unsigned long long pid = wcstoull(pidText, &end, 10);
-    if (!pid || pid > MAXDWORD || !end || *end || pid == GetCurrentProcessId()) {
-        MessageBoxW(window, L"프로그램 추가를 눌러 녹음할 앱을 선택하세요.", L"앱 선택", MB_ICONINFORMATION); SetFocus(addProgramButton); return;
+    const bool hasMixInputs=!engine->inputs.snapshot().empty();
+    if (!hasMixInputs) {
+        MessageBoxW(window, L"믹서에서 앱 추가를 눌러 송출할 프로그램을 추가하세요.", L"믹스 입력", MB_ICONINFORMATION); showMixer(true); return;
     }
     const int micIndex = static_cast<int>(SendMessageW(micCombo, CB_GETCURSEL, 0, 0));
     if (micIndex < 0 || micIndex >= static_cast<int>(microphones.size())) {
-        MessageBoxW(window, L"마이크를 연결하고 Windows 마이크 접근 권한을 확인한 뒤 새로고침하세요.", L"마이크 선택", MB_ICONINFORMATION); SetFocus(micCombo); return;
+        MessageBoxW(window, L"송출 설정에서 마이크 또는 마이크 사용 안 함을 선택하세요.", L"입력 선택", MB_ICONINFORMATION); showMixer(false); SetFocus(micCombo); return;
     }
     if (!virtualDevice || !virtualDevice->ready()) {
-        MessageBoxW(window, L"VB-CABLE을 설치한 뒤 앱을 다시 실행하세요. 장치 상태는 아래 안내를 확인하세요.", L"가상 마이크", MB_ICONINFORMATION); return;
+        const auto reason=virtualDevice ? virtualDevice->status() : L"가상 마이크를 준비하지 못했습니다.";
+        MessageBoxW(window, reason.c_str(), L"가상 마이크 준비 필요", MB_ICONINFORMATION); showMixer(false); return;
     }
     const bool saveWav = SendMessageW(recordCheck, BM_GETCHECK, 0, 0) == BST_CHECKED;
     wchar_t path[32768] = L"mix.wav";
@@ -223,7 +230,7 @@ void begin() {
     if (saveWav && !GetSaveFileNameW(&save)) return;
     if (!saveWav) path[0] = 0;
     try {
-        engine->start(static_cast<DWORD>(pid), microphones[micIndex].id, path, virtualDevice->renderId());
+        engine->start(microphones[micIndex].id, path, virtualDevice->renderId());
         outputPath = path; elapsed = 0;
         InvalidateRect(window, nullptr, FALSE);
     }
@@ -243,7 +250,7 @@ void paint(HDC dc) {
         active ? RGB(196, 53, 80) : Accent, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     for (int x : {28, 410}) round(dc, rect(x, 116, 362, 268), Surface, 20, Line);
     text(dc, L"01  프로그램", rect(48, 134, 300, 28), heading);
-    text(dc, L"녹음 입력 1개 · 선택한 앱과 하위 프로세스", rect(48, 165, 320, 22), small, Muted);
+    text(dc, L"믹서에 추가한 앱 전체를 함께 송출합니다.", rect(48, 165, 320, 22), small, Muted);
     text(dc, L"02  마이크", rect(430, 134, 300, 28), heading);
     text(dc, L"함께 녹음할 입력 장치", rect(430, 165, 310, 22), small, Muted);
     text(dc, L"볼륨", rect(48, 270, 80, 22), body, Muted);
@@ -319,7 +326,7 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         ShowWindow(meterLabel, SW_HIDE);
         backToMixer = control(L"BUTTON", L"← 볼륨 믹서", BS_OWNERDRAW | WS_TABSTOP, 640, 76, 132, 30, 902);
         refresh(); updateGains(); update(); addTray(); SetTimer(hwnd, 1, 100, nullptr);
-        sessionPanelWindow = sessionPanel.create(hwnd,engine->output);
+        sessionPanelWindow = sessionPanel.create(hwnd,engine->output,engine->monitor,engine->inputs);
         if (sessionPanelWindow) showMixer(true);
         return 0;
     case WM_COMMAND:
@@ -327,13 +334,12 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case 900: showMixer(false); break;
         case 901: mixer_dialogs::configureBroadcast(hwnd, broadcastSettings); break;
         case 902: showMixer(true); break;
+        case 904:
+            if(engine->active.load()) { engine->stop(); update(); }
+            else begin();
+            break;
         case AddProgram:
-            if (!engine->active.load() && mixer_dialogs::pickProgram(hwnd, selectedProgram)) {
-                SetWindowTextW(pidEdit, std::to_wstring(selectedProgram.pid).c_str());
-                SetWindowTextW(selectedProgramLabel, (selectedProgram.name + L" · PID " + std::to_wstring(selectedProgram.pid)).c_str());
-                SetWindowTextW(addProgramButton, L"프로그램 변경");
-                refresh(); update();
-            }
+            showMixer(true);
             break;
         case BroadcastSetup: mixer_dialogs::configureBroadcast(hwnd, broadcastSettings); break;
         case Processes:

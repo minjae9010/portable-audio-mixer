@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 namespace {
+int windowsWrites=0;
 void require(bool ok,const char* message) { if(!ok) throw std::runtime_error(message); }
 class Volume final : public ISimpleAudioVolume {
     ULONG refs_=1;
@@ -12,9 +13,9 @@ public:
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID,void**) override { return E_NOINTERFACE; }
     ULONG STDMETHODCALLTYPE AddRef() override { return ++refs_; }
     ULONG STDMETHODCALLTYPE Release() override { auto n=--refs_; if(!n) delete this; return n; }
-    HRESULT STDMETHODCALLTYPE SetMasterVolume(float v,LPCGUID) override { level_=v; return S_OK; }
+    HRESULT STDMETHODCALLTYPE SetMasterVolume(float v,LPCGUID) override { ++windowsWrites; level_=v; return S_OK; }
     HRESULT STDMETHODCALLTYPE GetMasterVolume(float* v) override { *v=level_; return S_OK; }
-    HRESULT STDMETHODCALLTYPE SetMute(BOOL v,LPCGUID) override { muted_=v; return S_OK; }
+    HRESULT STDMETHODCALLTYPE SetMute(BOOL v,LPCGUID) override { ++windowsWrites; muted_=v; return S_OK; }
     HRESULT STDMETHODCALLTYPE GetMute(BOOL* v) override { *v=muted_; return S_OK; }
 };
 sessions::Channel channel(const wchar_t* path,DWORD pid) {
@@ -36,10 +37,15 @@ int main() {
         require(visible.size()==1 && visible[0].volumes.size()==2,"Multiple PIDs and devices for an app must merge into one strip");
         require(SUCCEEDED(visible[0].setLevel(.4f)),"Grouped volume change must succeed");
         a.read(); b.read(); other.read();
-        require(std::abs(a.level-.4f)<.0001f && std::abs(b.level-.4f)<.0001f,"Volume must reach all selected app sessions");
+        require(a.level==1 && b.level==1,"Mix faders must never change the Windows volume of any selected process");
+        require(std::abs(visible[0].inputControl->gain.load()-.4f)<.0001f,"App fader must change its independent mix gain");
+        visible[0].setMute(true); a.read(); b.read();
+        require(!a.muted && !b.muted && visible[0].inputControl->muted.load(),"Mix mute must not mute the Windows app");
+        require(visible[0].pids.size()==2,"Every distinct process must reach the capture registry");
         require(other.level==1,"Same filename in another directory must remain untouched");
         visible=added.reconcile({other});
         require(visible.size()==1 && visible[0].volumes.empty(),"Closed app must retain an offline strip without binding another app");
+        require(visible[0].muted && std::abs(visible[0].level-.4f)<.0001f,"Offline refresh must preserve independent mix settings");
         auto restarted=channel(L"C:\\Apps\\Player.exe",99);
         require(added.reconcile({restarted})[0].pid==99,"Selected app must reconnect after restart");
         require(added.add(sessions::applicationKey(other),L"other.exe"),"Different executable path must remain selectable");
@@ -59,6 +65,7 @@ int main() {
         bus.active=true; bus.peak=.22f; master.read();
         require(std::abs(master.peak-.22f)<.0001f,"Meter must display actual mix bus peak");
         bus.active=false; master.read(); require(master.peak==0,"Stopped mix must show no signal");
+        require(windowsWrites==0,"App and master controls must never call Windows volume or mute setters");
         std::cout<<"Added-program filtering, grouping, volume isolation, restart and removal passed.\n";
         return 0;
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }

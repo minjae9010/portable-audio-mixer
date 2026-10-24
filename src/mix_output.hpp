@@ -6,6 +6,8 @@ namespace mix {
 struct OutputControl {
     std::atomic<float> gain{1}, peak{0};
     std::atomic<bool> muted{false}, active{false};
+    std::atomic<bool> failed{false};
+    std::atomic<bool> armed{false};
     float target() const { return muted.load() ? 0.0f : std::clamp(finiteSample(gain.load()),0.0f,1.0f); }
 };
 // Audio-thread owned. The same processed block goes to both output and recording.

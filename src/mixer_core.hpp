@@ -53,6 +53,33 @@ inline int16_t toPcm(float v) {
     return static_cast<int16_t>(std::lround(v * (v < 0 ? 32768.0f : 32767.0f)));
 }
 struct Meter { float process = 0, mic = 0, output = 0; uint64_t clipped = 0; };
+class InputFader {
+    float gain_;
+public:
+    explicit InputFader(float initial=1) : gain_(std::clamp(finiteSample(initial),0.0f,2.0f)) {}
+    float apply(Block& block,float target) {
+        target=std::clamp(finiteSample(target),0.0f,2.0f);
+        float peak=0;
+        for(size_t i=0;i<block.size();++i) {
+            const float gain=gain_+(target-gain_)*static_cast<float>(i+1)/static_cast<float>(block.size());
+            auto& frame=block[i]; frame.l=finiteSample(frame.l)*gain; frame.r=finiteSample(frame.r)*gain;
+            peak=std::max(peak,std::max(std::abs(frame.l),std::abs(frame.r)));
+        }
+        gain_=target; return peak;
+    }
+};
+inline void add(Block& destination,const Block& source) {
+    for(size_t i=0;i<destination.size();++i) { destination[i].l+=source[i].l; destination[i].r+=source[i].r; }
+}
+inline uint64_t limit(Block& block) {
+    uint64_t clipped=0;
+    for(auto& frame:block) {
+        if(std::abs(frame.l)>1 || std::abs(frame.r)>1) ++clipped;
+        frame.l=std::clamp(finiteSample(frame.l),-1.0f,1.0f);
+        frame.r=std::clamp(finiteSample(frame.r),-1.0f,1.0f);
+    }
+    return clipped;
+}
 class Mixer {
     float processGain_ = 1, micGain_ = 1;
 public:

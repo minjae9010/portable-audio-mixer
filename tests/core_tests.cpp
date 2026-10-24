@@ -110,6 +110,22 @@ void outputFaderTests() {
     output.muted=true; mix::OutputFader restarted(output.target()); block.fill({1,1});
     require(near(restarted.apply(block,output),0),"Starting a mix while muted must not leak an initial audio block");
 }
+void independentInputTests() {
+    mix::Block a,b,sum{}; a.fill({.8f,-.4f}); b.fill({.4f,.8f});
+    mix::InputFader appA(.25f),appB(.5f);
+    appA.apply(a,.25f); appB.apply(b,.5f);
+    mix::add(sum,a); mix::add(sum,b);
+    require(near(sum[0].l,.4f) && near(sum[0].r,.3f),"Independent app gains must affect only their contributions to the shared mix");
+    b.fill({.4f,.8f}); appB.apply(b,0); b.fill({.4f,.8f}); appB.apply(b,0);
+    sum=a; mix::add(sum,b);
+    require(near(sum[0].l,.2f) && near(sum[0].r,-.1f),"Muting one app must leave another app's mixed signal intact");
+    // Opposing signals cancel before the limiter; individual inputs are not clipped early.
+    sum.fill({1.5f,-1.5f}); b.fill({-.75f,.75f}); mix::add(sum,b);
+    require(mix::limit(sum)==0 && near(sum[0].l,.75f),"Multiple inputs must sum before final clipping");
+    sum.fill({2,-2}); require(mix::limit(sum)==mix::BlockFrames && sum[0].l==1 && sum[0].r==-1,"Final bus must limit combined audio once");
+    mix::InputFader initiallyMuted(0); sum.fill({1,1}); initiallyMuted.apply(sum,0);
+    require(sum[0].l==0 && sum.back().r==0,"Starting an app muted must not leak its first block");
+}
 void virtualMicRingTests() {
     pm::PcmRing ring;
     pm::Cursor a, b;
@@ -143,7 +159,7 @@ void virtualMicRingTests() {
 }
 int main(int argc, char** argv) {
     try {
-        timelineTests(); mixingTests(); outputFaderTests(); virtualMicRingTests();
+        timelineTests(); mixingTests(); outputFaderTests(); independentInputTests(); virtualMicRingTests();
         const auto path = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::path("core-test.wav");
         wavTests(path);
         std::cout << "PASS: " << assertions << " assertions; WAV artifact: " << path.string() << '\n';

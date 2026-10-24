@@ -6,6 +6,8 @@
 #include <string>
 #include <thread>
 #include "mix_output.hpp"
+#include "mix_monitor.hpp"
+#include "mix_inputs.hpp"
 
 class AudioEngine {
     HANDLE stop_ = nullptr;
@@ -13,9 +15,11 @@ class AudioEngine {
     mutable std::mutex textMutex_;
     std::wstring text_ = L"Idle.";
     void status(std::wstring text);
-    void run(DWORD pid, std::wstring micId, std::wstring path, std::wstring outputId) noexcept;
+    void run(std::wstring micId, std::wstring path, std::wstring outputId) noexcept;
 public:
     mix::OutputControl output;
+    MixMonitor monitor;
+    mix::Inputs inputs;
     std::atomic<bool> active{false};
     std::atomic<float> processGain{1}, micGain{1};
     std::atomic<float> processPeak{0}, micPeak{0}, outputPeak{0};
@@ -23,7 +27,7 @@ public:
     AudioEngine();
     ~AudioEngine();
     AudioEngine(const AudioEngine&) = delete;
-    void start(DWORD pid, std::wstring micId, std::wstring path, std::wstring outputId);
+    void start(std::wstring micId, std::wstring path, std::wstring outputId);
     void stop();
     std::wstring statusText() const;
 };

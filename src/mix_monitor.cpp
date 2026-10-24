@@ -14,11 +14,11 @@ struct Apartment {
     Apartment() { check(CoInitializeEx(nullptr, COINIT_MULTITHREADED)); }
     ~Apartment() { CoUninitialize(); }
 };
-struct Speakers {
+struct SpeakerSink {
     ComPtr<IAudioClient> client;
     ComPtr<IAudioRenderClient> writer;
     UINT32 capacity = 0;
-    explicit Speakers(const std::wstring& excludedEndpoint) {
+    explicit SpeakerSink(const std::wstring& excludedEndpoint) {
         ComPtr<IMMDeviceEnumerator> enumerator; ComPtr<IMMDevice> device;
         check(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator)));
         check(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device));
@@ -38,7 +38,7 @@ struct Speakers {
         check(client->GetService(IID_PPV_ARGS(&writer)));
         check(client->Start());
     }
-    ~Speakers() { if (client) client->Stop(); }
+    ~SpeakerSink() { if (client) client->Stop(); }
     bool writable() {
         UINT32 padding = 0; check(client->GetCurrentPadding(&padding));
         return padding <= capacity && capacity-padding >= mix::BlockFrames;
@@ -59,19 +59,19 @@ MixMonitor::MixMonitor() : wake_(CreateEventW(nullptr, FALSE, FALSE, nullptr)) {
 MixMonitor::~MixMonitor() { stop(); CloseHandle(wake_); }
 void MixMonitor::status(std::wstring text) { std::lock_guard<std::mutex> lock(mutex_); text_ = std::move(text); }
 std::wstring MixMonitor::statusText() const {
-    if (!enabled.load()) return L"믹스 듣기 꺼짐 · 가상 마이크 송출은 유지됩니다.";
-    if (!running_.load()) return L"믹스를 시작하면 같은 소리를 Windows 기본 스피커로 들려줍니다.";
+    if (!enabled.load()) return running_.load() ? L"믹스 듣기 꺼짐 · 가상 마이크 송출은 유지됩니다." : L"믹스 듣기 꺼짐 · 위의 믹스 시작을 눌러 송출하세요.";
+    if (!running_.load() && !failed_.load()) return L"믹스를 시작하면 같은 소리를 Windows 기본 스피커로 들려줍니다.";
     std::lock_guard<std::mutex> lock(mutex_); return text_;
 }
 void MixMonitor::enable(bool value) {
     { std::lock_guard<std::mutex> lock(mutex_); head_ = count_ = 0; }
-    enabled = value; failed_ = false; SetEvent(wake_);
+    enabled = value; failed_ = false; ++revision_; SetEvent(wake_);
 }
 void MixMonitor::start(std::wstring excludedEndpoint) {
     stop(); stopping_ = false; failed_ = false; dropped = 0;
     status(L"스피커 연결 중…"); running_ = true;
     try { worker_ = std::thread(&MixMonitor::run, this, std::move(excludedEndpoint)); }
-    catch (...) { running_ = false; status(L"스피커 듣기를 시작하지 못했습니다."); }
+    catch (...) { running_ = false; failed_ = true; status(L"스피커 듣기를 시작하지 못했습니다."); }
 }
 void MixMonitor::push(const mix::Block& block) {
     if (!enabled.load() || !active.load()) return;
@@ -91,14 +91,18 @@ void MixMonitor::stop() {
 void MixMonitor::run(std::wstring excludedEndpoint) noexcept {
     try {
         Apartment apartment;
-        std::unique_ptr<Speakers> speakers;
+        std::unique_ptr<SpeakerSink> speakers;
+        unsigned revision = revision_.load();
         while (!stopping_.load()) {
+            if (revision != revision_.load()) {
+                speakers.reset(); active = false; revision = revision_.load();
+            }
             if (!enabled.load()) {
                 speakers.reset(); active = false;
                 { std::lock_guard<std::mutex> lock(mutex_); head_ = count_ = 0; }
             } else if (!failed_.load()) {
                 try {
-                    if (!speakers) { speakers = std::make_unique<Speakers>(excludedEndpoint); active = true; status(L"최종 믹스를 Windows 기본 스피커로 듣는 중"); }
+                    if (!speakers) { speakers = std::make_unique<SpeakerSink>(excludedEndpoint); active = true; status(L"최종 믹스를 Windows 기본 스피커로 듣는 중"); }
                     while (enabled.load() && !stopping_.load() && speakers->writable()) {
                         mix::Block block;
                         { std::lock_guard<std::mutex> lock(mutex_);
@@ -112,8 +116,8 @@ void MixMonitor::run(std::wstring excludedEndpoint) noexcept {
                     else { std::wostringstream text; text << L"스피커 연결 실패 (0x" << std::hex << static_cast<unsigned long>(f.hr) << L"). 듣기를 껐다 켜서 다시 시도하세요."; status(text.str()); }
                 }
             }
-            WaitForSingleObject(wake_, 5);
+            WaitForSingleObject(wake_, enabled.load() ? 5 : 100);
         }
-    } catch (...) { status(L"스피커 듣기 오류 · 가상 마이크 송출은 계속됩니다."); }
+    } catch (...) { failed_ = true; status(L"스피커 듣기 오류 · 가상 마이크 송출은 계속됩니다."); }
     active = false; running_ = false;
 }
